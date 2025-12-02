@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id              String           @id @default(cuid())
+  name            String
+  phone           String           @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  orders          Order[]
+  purchaseRecords PurchaseRecord[]
+}
+
+model Product {
+  id              String           @id @default(cuid())
+  sku             String           @unique
+  currentStock    Int              @default(0)
+  totalOut        Int              @default(0)
+  totalIn         Int              @default(0)
+  price           Float            @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  orderItems      OrderItem[]
+  purchaseRecords PurchaseRecord[]
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber Int         @default(0)
+  customerId  String
+  status      String      @default("pending")
+  totalAmount Float       @default(0)
+  note        String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id])
+}
+
+model PurchaseRecord {
+  id           String   @id @default(cuid())
+  customerId   String
+  productId    String
+  quantity     Int
+  price        Float
+  totalAmount  Float
+  purchaseDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id])
+  customer     Customer @relation(fields: [customerId], references: [id])
+}
