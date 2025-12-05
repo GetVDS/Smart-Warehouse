@@ -458,9 +458,31 @@ install_ssl_certificate() {
     log_info "SSL证书安装完成"
 }
 
+# 复制项目文件
+copy_project_files() {
+    log_info "复制项目文件..."
+    
+    # 获取当前脚本所在目录
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # 复制所有必要文件到部署目录
+    cp -r "$SCRIPT_DIR"/* /opt/apps/inventory-system/
+    
+    # 排除不需要的文件
+    rm -rf /opt/apps/inventory-system/.git
+    rm -rf /opt/apps/inventory-system/node_modules
+    rm -rf /opt/apps/inventory-system/.next
+    rm -rf /opt/apps/inventory-system/db/custom.db
+    
+    log_info "项目文件复制完成"
+}
+
 # 构建和启动应用
 build_and_start() {
     log_info "构建和启动应用..."
+    
+    # 复制项目文件
+    copy_project_files
     
     # 进入应用目录
     cd /opt/apps/inventory-system
