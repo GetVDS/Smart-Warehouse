@@ -70,6 +70,12 @@ backup_config() {
         cp "$APP_DIR/docker-compose.yml" "$BACKUP_DIR/docker-compose_$TIMESTAMP.yml"
         log_info "Docker Compose配置备份完成: docker-compose_$TIMESTAMP.yml"
     fi
+    
+    # 备份生产Docker配置
+    if [[ -f "$APP_DIR/production-docker-compose.yml" ]]; then
+        cp "$APP_DIR/production-docker-compose.yml" "$BACKUP_DIR/production-docker-compose_$TIMESTAMP.yml"
+        log_info "生产Docker Compose配置备份完成: production-docker-compose_$TIMESTAMP.yml"
+    fi
 }
 
 # 备份应用日志
@@ -96,6 +102,7 @@ cleanup_old_backups() {
     find "$BACKUP_DIR" -name "*.tar.gz" -mtime +$RETENTION_DAYS -delete
     find "$BACKUP_DIR" -name "env_*" -mtime +$RETENTION_DAYS -delete
     find "$BACKUP_DIR" -name "docker-compose_*.yml" -mtime +$RETENTION_DAYS -delete
+    find "$BACKUP_DIR" -name "production-docker-compose_*.yml" -mtime +$RETENTION_DAYS -delete
     
     log_info "旧备份清理完成"
 }
@@ -112,6 +119,7 @@ create_backup_info() {
 - 环境变量: env_$TIMESTAMP
 - Nginx配置: nginx_$TIMESTAMP.tar.gz
 - Docker配置: docker-compose_$TIMESTAMP.yml
+- 生产Docker配置: production-docker-compose_$TIMESTAMP.yml
 - 应用日志: logs_$TIMESTAMP.tar.gz
 - Nginx日志: nginx_logs_$TIMESTAMP.tar.gz
 

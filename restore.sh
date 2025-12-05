@@ -55,7 +55,10 @@ stop_services() {
     cd "$APP_DIR"
     
     if [[ -f "docker-compose.yml" ]]; then
-        docker-compose down
+        docker compose down
+        log_info "服务已停止"
+    elif [[ -f "production-docker-compose.yml" ]]; then
+        docker compose -f production-docker-compose.yml down
         log_info "服务已停止"
     else
         log_warn "Docker Compose文件不存在，跳过停止服务"
@@ -127,6 +130,12 @@ restore_config() {
         cp "$TEMP_DIR/docker-compose_$TIMESTAMP.yml" "$APP_DIR/docker-compose.yml"
         log_info "Docker配置恢复完成"
     fi
+    
+    # 恢复生产Docker配置
+    if [[ -f "$TEMP_DIR/production-docker-compose_$TIMESTAMP.yml" ]]; then
+        cp "$TEMP_DIR/production-docker-compose_$TIMESTAMP.yml" "$APP_DIR/production-docker-compose.yml"
+        log_info "生产Docker配置恢复完成"
+    fi
 }
 
 # 恢复日志（可选）
@@ -175,18 +184,33 @@ start_services() {
     cd "$APP_DIR"
     
     if [[ -f "docker-compose.yml" ]]; then
-        docker-compose up -d
+        docker compose up -d
         
         # 等待服务启动
         log_info "等待服务启动..."
         sleep 10
         
         # 检查服务状态
-        if docker-compose ps | grep -q "Up"; then
+        if docker compose ps | grep -q "Up"; then
             log_info "服务启动成功"
         else
             log_error "服务启动失败"
-            docker-compose logs
+            docker compose logs
+            exit 1
+        fi
+    elif [[ -f "production-docker-compose.yml" ]]; then
+        docker compose -f production-docker-compose.yml up -d
+        
+        # 等待服务启动
+        log_info "等待服务启动..."
+        sleep 10
+        
+        # 检查服务状态
+        if docker compose -f production-docker-compose.yml ps | grep -q "Up"; then
+            log_info "服务启动成功"
+        else
+            log_error "服务启动失败"
+            docker compose -f production-docker-compose.yml logs
             exit 1
         fi
     else
@@ -215,10 +239,20 @@ verify_restore() {
     
     # 检查服务状态
     cd "$APP_DIR"
-    if docker-compose ps | grep -q "Up"; then
-        log_info "服务运行正常"
+    if [[ -f "docker-compose.yml" ]]; then
+        if docker compose ps | grep -q "Up"; then
+            log_info "服务运行正常"
+        else
+            log_warn "服务状态异常"
+        fi
+    elif [[ -f "production-docker-compose.yml" ]]; then
+        if docker compose -f production-docker-compose.yml ps | grep -q "Up"; then
+            log_info "服务运行正常"
+        else
+            log_warn "服务状态异常"
+        fi
     else
-        log_warn "服务状态异常"
+        log_warn "无法检查服务状态，Docker Compose文件不存在"
     fi
 }
 
@@ -242,12 +276,23 @@ show_restore_result() {
     echo ""
     echo "服务状态:"
     cd "$APP_DIR"
-    docker-compose ps
-    echo ""
-    echo "管理命令:"
-    echo "  查看日志: docker-compose logs -f"
-    echo "  重启服务: docker-compose restart"
-    echo "  停止服务: docker-compose down"
+    if [[ -f "docker-compose.yml" ]]; then
+        docker compose ps
+        echo ""
+        echo "管理命令:"
+        echo "  查看日志: docker compose logs -f"
+        echo "  重启服务: docker compose restart"
+        echo "  停止服务: docker compose down"
+    elif [[ -f "production-docker-compose.yml" ]]; then
+        docker compose -f production-docker-compose.yml ps
+        echo ""
+        echo "管理命令:"
+        echo "  查看日志: docker compose -f production-docker-compose.yml logs -f"
+        echo "  重启服务: docker compose -f production-docker-compose.yml restart"
+        echo "  停止服务: docker compose -f production-docker-compose.yml down"
+    else
+        echo "无法显示服务状态，Docker Compose文件不存在"
+    fi
     echo "=================================="
 }
 

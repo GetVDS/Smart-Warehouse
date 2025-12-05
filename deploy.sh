@@ -79,6 +79,12 @@ install_docker() {
     # 安装Docker Engine
     sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     
+    # 验证docker compose命令
+    if ! docker compose version &> /dev/null; then
+        log_error "Docker Compose插件安装失败"
+        exit 1
+    fi
+    
     # 启动Docker服务
     sudo systemctl enable docker
     sudo systemctl start docker
@@ -460,7 +466,7 @@ build_and_start() {
     cd /opt/apps/inventory-system
     
     # 构建并启动服务
-    docker-compose up -d --build
+    docker compose up -d --build
     
     log_info "应用启动完成"
 }
@@ -475,10 +481,10 @@ show_deployment_info() {
     echo "域名: https://$DOMAIN"
     echo "应用目录: /opt/apps/inventory-system"
     echo "管理命令:"
-    echo "  查看状态: docker-compose ps"
-    echo "  查看日志: docker-compose logs -f"
-    echo "  重启服务: docker-compose restart"
-    echo "  停止服务: docker-compose down"
+    echo "  查看状态: docker compose ps"
+    echo "  查看日志: docker compose logs -f"
+    echo "  重启服务: docker compose restart"
+    echo "  停止服务: docker compose down"
     echo "=================================="
 }
 
@@ -507,7 +513,7 @@ main() {
     show_deployment_info
     
     log_warn "请重新登录以使Docker用户组更改生效"
-    log_warn "然后运行: cd /opt/apps/inventory-system && docker-compose logs -f"
+    log_warn "然后运行: cd /opt/apps/inventory-system && docker compose logs -f"
 }
 
 # 运行主函数
