@@ -204,45 +204,28 @@ create_dockerfile() {
     # 如果项目根目录没有Dockerfile，则创建一个
     if [ ! -f /opt/apps/inventory-system/Dockerfile ]; then
         log_info "创建默认Dockerfile..."
-        cat > /opt/apps/inventory-system/Dockerfile <<'EOF'
-# 使用官方Node.js运行时作为基础镜像
-FROM node:18-alpine AS base
-
-# 安装依赖阶段
-FROM base AS deps
-# 检查https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine
-RUN apk add --no-cache libc6-compat
-WORKDIR /app
-
-# 复制package文件
-COPY package*.json ./
-COPY prisma ./prisma/
-
-# 安装所有依赖（包括开发依赖，因为构建需要）
-RUN npm ci --legacy-peer-deps && npm cache clean --force
-
+        sudo cat > /opt/apps/inventory-system/Dockerfile <<'EOF'
 # 构建阶段
-FROM base AS builder
+FROM node:18-alpine AS builder
+
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/prisma ./prisma/
+
+# 先复制所有源代码和配置文件
 COPY . .
+
+# 安装所有依赖
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # 生成Prisma客户端
 RUN npx prisma generate
 
-# 设置环境变量
-ENV NEXT_TELEMETRY_DISABLED 1
-
 # 构建应用
 RUN npm run build
 
-# 运行阶段
-FROM base AS runner
-WORKDIR /app
+# 生产阶段
+FROM node:18-alpine AS runner
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+WORKDIR /app
 
 # 创建非root用户
 RUN addgroup --system --gid 1001 nodejs
@@ -250,16 +233,19 @@ RUN adduser --system --uid 1001 nextjs
 
 # 复制构建产物
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma ./prisma
 
-# 复制prisma相关文件
-COPY --from=builder /app/prisma ./prisma/
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# 创建数据库目录
+RUN mkdir -p db && chown -R nextjs:nodejs db
 
+# 设置用户
 USER nextjs
 
+# 暴露端口
 EXPOSE 3000
 
 ENV PORT 3000
@@ -277,12 +263,12 @@ EOF
 create_docker_compose() {
     log_info "创建Docker Compose配置..."
     
-    cat > /opt/apps/inventory-system/docker-compose.yml <<EOF
+    sudo cat > /opt/apps/inventory-system/docker-compose.yml <<EOF
 version: '3.8'
 
 services:
   app:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     ports:
@@ -336,7 +322,8 @@ create_nginx_config() {
     # 如果项目根目录没有nginx.conf，则创建一个
     if [ ! -f /opt/apps/inventory-system/nginx/nginx.conf ]; then
         log_info "创建默认nginx.conf..."
-        cat > /opt/apps/inventory-system/nginx/nginx.conf <<'EOF'
+        sudo mkdir -p /opt/apps/inventory-system/nginx
+        sudo cat > /opt/apps/inventory-system/nginx/nginx.conf <<'EOF'
 user nginx;
 worker_processes auto;
 error_log /var/log/nginx/error.log notice;
@@ -497,23 +484,20 @@ copy_project_files() {
     # 获取当前脚本所在目录
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
-    # 确保目标目录存在
-    mkdir -p /opt/apps/inventory-system
+    # 确保构建目录存在
+    sudo mkdir -p /opt/apps/inventory-system
     
-    # 复制所有必要的源代码文件和目录
-    log_info "复制源代码..."
-    cp -r "$SCRIPT_DIR/src" /opt/apps/inventory-system/
-    cp -r "$SCRIPT_DIR/prisma" /opt/apps/inventory-system/
-    cp -r "$SCRIPT_DIR/public" /opt/apps/inventory-system/
-    
-    # 复制配置文件
-    log_info "复制配置文件..."
-    cp "$SCRIPT_DIR/package*.json" /opt/apps/inventory-system/
-    cp "$SCRIPT_DIR/tsconfig.json" /opt/apps/inventory-system/
-    cp "$SCRIPT_DIR/next.config.js" /opt/apps/inventory-system/
-    cp "$SCRIPT_DIR/tailwind.config.ts" /opt/apps/inventory-system/
-    cp "$SCRIPT_DIR/postcss.config.mjs" /opt/apps/inventory-system/
-    cp "$SCRIPT_DIR/.dockerignore" /opt/apps/inventory-system/
+    # 复制所有必需的文件和目录
+    log_info "复制源代码和配置文件..."
+    sudo cp -r "$SCRIPT_DIR/src" /opt/apps/inventory-system/
+    sudo cp -r "$SCRIPT_DIR/prisma" /opt/apps/inventory-system/
+    sudo cp -r "$SCRIPT_DIR/public" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/package*.json" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/tsconfig.json" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/next.config.js" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/tailwind.config.ts" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/postcss.config.mjs" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/.dockerignore" /opt/apps/inventory-system/
     
     # 复制Docker相关文件
     if [ -f "$SCRIPT_DIR/Dockerfile" ]; then
@@ -525,10 +509,13 @@ copy_project_files() {
     
     # 排除不需要的文件
     log_info "清理不需要的文件..."
-    rm -rf /opt/apps/inventory-system/.git
-    rm -rf /opt/apps/inventory-system/node_modules
-    rm -rf /opt/apps/inventory-system/.next
-    rm -rf /opt/apps/inventory-system/db/custom.db
+    sudo rm -rf /opt/apps/inventory-system/.git
+    sudo rm -rf /opt/apps/inventory-system/node_modules
+    sudo rm -rf /opt/apps/inventory-system/.next
+    sudo rm -rf /opt/apps/inventory-system/db/custom.db
+    
+    # 设置正确的文件权限
+    sudo chown -R $USER:$USER /opt/apps/inventory-system
     
     log_info "项目文件复制完成"
 }
