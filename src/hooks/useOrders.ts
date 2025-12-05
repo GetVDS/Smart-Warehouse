@@ -74,13 +74,11 @@ export const useOrders = (user: any) => {
       successMessage: '订单创建成功'
     });
 
-    if (result.success && result.data?.order) {
-      // 成功后将新订单添加到列表开头，避免重新获取导致数据丢失
-      setOrders(prevOrders => [result.data.order, ...prevOrders]);
-    }
+    // 不再在这里自动添加订单到列表，让页面组件处理
+    // 这样可以确保订单创建后立即可以执行操作
 
     return result;
-  }, [setOrders]);
+  }, []);
 
   const deleteOrder = useCallback(async (id: string) => {
     const result = await api.delete(`/api/orders/${id}`, {

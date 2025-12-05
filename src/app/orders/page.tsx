@@ -129,41 +129,7 @@ export default function OrdersPage() {
       }
     }
 
-    // 创建临时订单ID用于乐观更新
-    const tempOrderId = `temp-${Date.now()}`;
-    // 获取当前最大订单号，如果没有则从1开始
-    const maxOrderNumber = orders.length > 0 ? Math.max(...orders.map(o => o.orderNumber || 0)) : 0;
-    const tempOrderNumber = maxOrderNumber + 1;
-
-    // 乐观更新：立即在UI中显示新订单
-    const selectedCustomerData = customers.find(c => c.id === selectedCustomer);
-    const tempOrderItems = orderItems.map(item => {
-      const product = products.find(p => p.id === item.productId);
-      return {
-        id: `temp-item-${Date.now()}-${Math.random()}`,
-        productId: item.productId,
-        quantity: item.quantity,
-        price: product?.price || 0,
-        product: product || { id: item.productId, sku: 'Unknown' }
-      };
-    });
-
-    const optimisticOrder = {
-      id: tempOrderId,
-      orderNumber: tempOrderNumber,
-      customerId: selectedCustomer,
-      status: 'pending',
-      totalAmount: tempOrderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0),
-      note: orderNote,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      customer: selectedCustomerData || { id: selectedCustomer, name: 'Unknown', phone: 'Unknown' },
-      orderItems: tempOrderItems
-    };
-
-    // 立即更新UI
-    setOrders(prevOrders => [optimisticOrder, ...prevOrders]);
-
+    // 创建订单时不进行乐观更新，等待服务器返回真实订单ID
     const result = await createOrder({
       customerId: selectedCustomer,
       items: orderItems,
@@ -176,14 +142,9 @@ export default function OrdersPage() {
       setOrderItems([]);
       setOrderNote('');
       
-      // 如果API返回了真实订单数据，使用它替换临时订单
+      // 服务器返回真实订单数据后，添加到列表开头
       if (result.data?.order) {
-        setOrders(prevOrders => {
-          // 移除临时订单
-          const filteredOrders = prevOrders.filter(order => order.id !== tempOrderId);
-          // 添加真实订单到开头
-          return [result.data.order, ...filteredOrders];
-        });
+        setOrders(prevOrders => [result.data.order, ...prevOrders]);
       }
       
       // 刷新今日统计数据
@@ -211,34 +172,19 @@ export default function OrdersPage() {
       } catch (error) {
         console.error('Failed to fetch today stats:', error);
       }
-    } else {
-      // 如果创建失败，移除乐观更新的订单
-      setOrders(prevOrders => prevOrders.filter(order => order.id !== tempOrderId));
     }
-  }, [selectedCustomer, orderItems, products, customers, orders, orderNote, createOrder, setOrders]);
+  }, [selectedCustomer, orderItems, products, customers, createOrder, setOrders]);
 
   const handleDeleteOrder = useCallback(async (id: string) => {
     showConfirm(
       '确定要删除此订单吗？此操作不可恢复。',
       async () => {
-        // 检查是否为临时订单ID，如果是则不执行操作
-        if (id.startsWith('temp-')) {
-          showConfirm('临时订单无法删除，请等待订单创建完成', () => {}, { title: '操作无效', confirmText: '确定' });
-          return;
-        }
-        
         await deleteOrder(id);
       }
     );
   }, [deleteOrder]);
 
   const handleConfirmOrder = useCallback(async (id: string) => {
-    // 检查是否为临时订单ID，如果是则不执行操作
-    if (id.startsWith('temp-')) {
-      showConfirm('临时订单无法确认，请等待订单创建完成', () => {}, { title: '操作无效', confirmText: '确定' });
-      return;
-    }
-
     showConfirm(
       '确定要确认此订单吗？确认后将减少库存。',
       async () => {
@@ -325,12 +271,6 @@ export default function OrdersPage() {
   }, [setOrders, fetchOrders]);
 
   const handleCancelOrder = useCallback(async (id: string) => {
-    // 检查是否为临时订单ID，如果是则不执行操作
-    if (id.startsWith('temp-')) {
-      showConfirm('临时订单无法取消，请等待订单创建完成', () => {}, { title: '操作无效', confirmText: '确定' });
-      return;
-    }
-
     showConfirm(
       '确定要取消此订单吗？此操作不可恢复。',
       async () => {
