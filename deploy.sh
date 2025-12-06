@@ -272,8 +272,6 @@ create_docker_compose() {
     log_info "创建Docker Compose配置..."
     
     sudo cat > /opt/apps/inventory-system/docker-compose.yml <<EOF
-version: '3.8'
-
 services:
   app:
     build:
@@ -605,7 +603,36 @@ build_and_start() {
     
     # 初始化数据库
     log_info "初始化数据库..."
-    docker compose exec app npx prisma migrate deploy
+    
+    # 数据库初始化失败重试机制
+    retry_count=0
+    max_retries=3
+    
+    while [ $retry_count -lt $max_retries ]; do
+        # 检查是否需要基线化数据库
+        if [ -n "$(ls -A prisma/migrations)" ]; then
+            log_info "检测到现有迁移，基线化数据库..."
+            docker compose exec app npx prisma migrate baseline || log_warn "数据库基线化失败，继续正常迁移流程..."
+        fi
+        
+        # 部署迁移
+        if docker compose exec app npx prisma migrate deploy; then
+            log_info "数据库迁移成功"
+            break
+        else
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                log_warn "数据库初始化失败，重试 $retry_count/$max_retries..."
+                sleep 5
+                # 重启应用容器
+                docker compose restart app
+                sleep 10
+            else
+                log_error "数据库初始化失败，已达到最大重试次数"
+                exit 1
+            fi
+        fi
+    done
     
     # 初始化管理员用户
     log_info "初始化管理员用户..."
