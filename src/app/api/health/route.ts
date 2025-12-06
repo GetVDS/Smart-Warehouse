@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
       nodeEnv: process.env.NODE_ENV || 'development'
     };
     
-    // 总体健康状态
-    const isHealthy = dbStatus === 'healthy' && memoryUsagePercent < 90;
+    // 总体健康状态 - 调整内存阈值为95%以避免误报
+    const isHealthy = dbStatus === 'healthy' && memoryUsagePercent < 95;
     
     const healthData = {
       status: isHealthy ? 'healthy' : 'unhealthy',
