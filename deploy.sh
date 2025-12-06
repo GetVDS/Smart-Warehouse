@@ -649,6 +649,134 @@ build_and_start() {
     docker compose up -d nginx
     
     log_info "应用启动完成"
+    
+    # 部署后自检验证
+    post_deployment_check
+}
+
+# 部署后自检验证
+post_deployment_check() {
+    log_info "开始部署后自检验证..."
+    
+    # 等待服务完全启动
+    log_info "等待服务完全启动..."
+    sleep 30
+    
+    # 检查容器状态
+    log_info "检查容器状态..."
+    docker compose ps
+    
+    # 检查应用健康状态
+    log_info "检查应用健康状态..."
+    if curl -f -s http://localhost:3000/api/health > /dev/null; then
+        log_info "✅ 应用健康检查通过"
+    else
+        log_error "❌ 应用健康检查失败"
+        log_info "获取详细错误信息..."
+        curl -v http://localhost:3000/api/health || true
+    fi
+    
+    # 检查Nginx反向代理状态
+    log_info "检查Nginx反向代理状态..."
+    if curl -f -s http://localhost/api/health > /dev/null; then
+        log_info "✅ Nginx反向代理正常"
+    else
+        log_error "❌ Nginx反向代理失败"
+        log_info "获取详细错误信息..."
+        curl -v http://localhost/api/health || true
+        
+        # 检查Nginx配置
+        log_info "检查Nginx配置..."
+        docker compose exec nginx nginx -t || true
+        
+        # 检查Nginx日志
+        log_info "查看Nginx错误日志..."
+        docker compose logs nginx || true
+    fi
+    
+    # 检查API端点连通性
+    log_info "检查关键API端点..."
+    
+    # 检查登录API
+    log_info "检查登录API (/api/auth/login)..."
+    login_response=$(curl -s -w "%{http_code}" -o /tmp/login_response.json -X POST http://localhost/api/auth/login \
+        -H "Content-Type: application/json" \
+        -d '{"username":"admin","password":"admin123"}' || echo "000")
+    
+    if [[ "$login_response" == "200" ]]; then
+        log_info "✅ 登录API正常"
+    else
+        log_error "❌ 登录API失败 (HTTP $login_response)"
+        if [ -f /tmp/login_response.json ]; then
+            log_info "登录API响应内容:"
+            cat /tmp/login_response.json
+        fi
+    fi
+    
+    # 检查产品API
+    log_info "检查产品API (/api/products)..."
+    products_response=$(curl -s -w "%{http_code}" -o /tmp/products_response.json http://localhost/api/products || echo "000")
+    
+    if [[ "$products_response" == "200" ]]; then
+        log_info "✅ 产品API正常"
+    else
+        log_error "❌ 产品API失败 (HTTP $products_response)"
+        if [ -f /tmp/products_response.json ]; then
+            log_info "产品API响应内容:"
+            cat /tmp/products_response.json
+        fi
+    fi
+    
+    # 检查应用容器日志中的错误
+    log_info "检查应用容器日志中的错误..."
+    error_count=$(docker compose logs app 2>&1 | grep -i error | wc -l)
+    if [ "$error_count" -gt 0 ]; then
+        log_warn "发现 $error_count 个错误日志条目"
+        docker compose logs app | tail -20
+    else
+        log_info "✅ 应用日志中未发现错误"
+    fi
+    
+    # 检查数据库连接
+    log_info "检查数据库连接..."
+    if docker compose exec app npx prisma db pull --force > /dev/null 2>&1; then
+        log_info "✅ 数据库连接正常"
+    else
+        log_error "❌ 数据库连接失败"
+        docker compose exec app npx prisma db pull --force || true
+    fi
+    
+    # 生成自检报告
+    log_info "生成自检报告..."
+    cat > /opt/apps/inventory-system/deployment-check-report.txt <<EOF
+智慧库存系统部署自检报告
+生成时间: $(date)
+域名: https://$DOMAIN
+
+=== 容器状态 ===
+$(docker compose ps)
+
+=== 健康检查 ===
+应用健康状态: $(curl -s -w "%{http_code}" -o /dev/null http://localhost:3000/api/health)
+Nginx代理状态: $(curl -s -w "%{http_code}" -o /dev/null http://localhost/api/health)
+
+=== API端点测试 ===
+登录API: $login_response
+产品API: $products_response
+
+=== 错误统计 ===
+应用日志错误数: $error_count
+
+=== 建议的后续步骤 ===
+1. 访问 https://$DOMAIN 确认前端正常加载
+2. 使用 admin/admin123 登录系统
+3. 检查所有功能模块是否正常工作
+4. 监控系统性能和日志
+
+EOF
+    
+    log_info "自检报告已保存到: /opt/apps/inventory-system/deployment-check-report.txt"
+    log_info "部署后自检验证完成"
 }
 
 # 显示部署信息
