@@ -210,11 +210,15 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# 先复制所有源代码和配置文件
-COPY . .
+# 先复制package文件以利用Docker缓存
+COPY package*.json ./
+COPY .npmrc ./
 
-# 安装所有依赖
+# 安装依赖
 RUN npm ci --legacy-peer-deps && npm cache clean --force
+
+# 复制所有源代码和配置文件
+COPY . .
 
 # 生成Prisma客户端
 RUN npx prisma generate
@@ -231,16 +235,15 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 复制构建产物
+# 复制构建产物和必要的文件
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package.json ./package.json
 
-# 创建数据库目录
-RUN mkdir -p db && chown -R nextjs:nodejs db
+# 创建数据库目录和日志目录
+RUN mkdir -p db logs && chown -R nextjs:nodejs db logs
 
 # 设置用户
 USER nextjs
@@ -250,6 +253,11 @@ EXPOSE 3000
 
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
+ENV NODE_ENV "production"
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
 
 # 启动应用
 CMD ["node", "server.js"]
@@ -518,18 +526,21 @@ copy_project_files() {
     # 确保构建目录存在
     sudo mkdir -p /opt/apps/inventory-system
     
-    # 复制所有必需的文件和目录
+    # 复制所有必需的文件和目录 - 确保完整性
     log_info "复制源代码和配置文件..."
+    
+    # 复制核心目录
     sudo cp -r "$SCRIPT_DIR/src" /opt/apps/inventory-system/
     sudo cp -r "$SCRIPT_DIR/prisma" /opt/apps/inventory-system/
     sudo cp -r "$SCRIPT_DIR/public" /opt/apps/inventory-system/
-    # 复制package.json和package-lock.json
-    if [ -f "$SCRIPT_DIR/package.json" ]; then
-        sudo cp "$SCRIPT_DIR/package.json" /opt/apps/inventory-system/
-    fi
-    if [ -f "$SCRIPT_DIR/package-lock.json" ]; then
-        sudo cp "$SCRIPT_DIR/package-lock.json" /opt/apps/inventory-system/
-    fi
+    sudo cp -r "$SCRIPT_DIR/lib" /opt/apps/inventory-system/src/ 2>/dev/null || true
+    sudo cp -r "$SCRIPT_DIR/types" /opt/apps/inventory-system/src/ 2>/dev/null || true
+    sudo cp -r "$SCRIPT_DIR/hooks" /opt/apps/inventory-system/src/ 2>/dev/null || true
+    sudo cp -r "$SCRIPT_DIR/components" /opt/apps/inventory-system/src/ 2>/dev/null || true
+    
+    # 复制配置文件 - 确保所有必需文件都被复制
+    sudo cp "$SCRIPT_DIR/package.json" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/package-lock.json" /opt/apps/inventory-system/
     sudo cp "$SCRIPT_DIR/tsconfig.json" /opt/apps/inventory-system/
     sudo cp "$SCRIPT_DIR/next.config.js" /opt/apps/inventory-system/
     sudo cp "$SCRIPT_DIR/tailwind.config.ts" /opt/apps/inventory-system/
@@ -538,17 +549,26 @@ copy_project_files() {
     sudo cp "$SCRIPT_DIR/components.json" /opt/apps/inventory-system/
     sudo cp "$SCRIPT_DIR/eslint.config.mjs" /opt/apps/inventory-system/
     sudo cp "$SCRIPT_DIR/.npmrc" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/.env" /opt/apps/inventory-system/ 2>/dev/null || true
     
     # 复制初始化脚本
     log_info "复制初始化脚本..."
     sudo cp "$SCRIPT_DIR/init-admin.js" /opt/apps/inventory-system/
+    sudo cp "$SCRIPT_DIR/init-test-data.js" /opt/apps/inventory-system/ 2>/dev/null || true
+    sudo cp "$SCRIPT_DIR/create-simple-test-data.js" /opt/apps/inventory-system/ 2>/dev/null || true
     
     # 复制Docker相关文件
     if [ -f "$SCRIPT_DIR/Dockerfile" ]; then
         sudo cp "$SCRIPT_DIR/Dockerfile" /opt/apps/inventory-system/
     fi
-    if [ -f "$SCRIPT_DIR/nginx.conf" ]; then
-        sudo cp "$SCRIPT_DIR/nginx.conf" /opt/apps/inventory-system/nginx/
+    if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+        sudo cp "$SCRIPT_DIR/docker-compose.yml" /opt/apps/inventory-system/
+    fi
+    if [ -f "$SCRIPT_DIR/docker-compose.prod.yml" ]; then
+        sudo cp "$SCRIPT_DIR/docker-compose.prod.yml" /opt/apps/inventory-system/
+    fi
+    if [ -f "$SCRIPT_DIR/Caddyfile" ]; then
+        sudo cp "$SCRIPT_DIR/Caddyfile" /opt/apps/inventory-system/
     fi
     
     # 排除不需要的文件
@@ -557,6 +577,7 @@ copy_project_files() {
     sudo rm -rf /opt/apps/inventory-system/node_modules
     sudo rm -rf /opt/apps/inventory-system/.next
     sudo rm -rf /opt/apps/inventory-system/db/custom.db
+    sudo rm -rf /opt/apps/inventory-system/logs
     
     # 设置正确的文件权限
     sudo chown -R $USER:$USER /opt/apps/inventory-system
