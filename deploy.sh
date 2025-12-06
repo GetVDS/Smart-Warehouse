@@ -327,13 +327,13 @@ EOF
 
 # 创建Nginx配置
 create_nginx_config() {
-    log_info "使用项目根目录的nginx.conf..."
+    log_info "创建优化的nginx配置..."
     
-    # 如果项目根目录没有nginx.conf，则创建一个
-    if [ ! -f /opt/apps/inventory-system/nginx/nginx.conf ]; then
-        log_info "创建默认nginx.conf..."
-        sudo mkdir -p /opt/apps/inventory-system/nginx
-        sudo cat > /opt/apps/inventory-system/nginx/nginx.conf <<'EOF'
+    # 创建nginx目录
+    sudo mkdir -p /opt/apps/inventory-system/nginx
+    
+    # 创建优化的nginx配置，解决502 Bad Gateway问题
+    sudo cat > /opt/apps/inventory-system/nginx/nginx.conf <<EOF
 user nginx;
 worker_processes auto;
 error_log /var/log/nginx/error.log notice;
@@ -382,6 +382,8 @@ http {
     # 上游服务器配置
     upstream app {
         server app:3000;
+        # 添加健康检查和连接保持
+        keepalive 32;
     }
 
     # HTTP重定向到HTTPS
@@ -394,11 +396,11 @@ http {
     # HTTPS主服务器配置
     server {
         listen 443 ssl http2;
-        server_name _;
+        server_name $DOMAIN;
 
-        # SSL证书配置
-        ssl_certificate /etc/ssl/certs/cert.pem;
-        ssl_certificate_key /etc/ssl/private/key.pem;
+        # SSL证书配置 (Let's Encrypt)
+        ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
         
         # SSL安全配置
         ssl_protocols TLSv1.2 TLSv1.3;
@@ -413,21 +415,7 @@ http {
         add_header X-XSS-Protection "1; mode=block";
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
-        # 静态文件缓存
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-            try_files \$uri @app;
-        }
-
-        # Next.js静态资源
-        location /_next/static/ {
-            alias /var/www/html/_next/static/;
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-
-        # API路由
+        # API路由 - 添加CORS支持
         location /api/ {
             proxy_pass http://app;
             proxy_http_version 1.1;
@@ -439,6 +427,26 @@ http {
             proxy_set_header X-Forwarded-Proto \$scheme;
             proxy_cache_bypass \$http_upgrade;
             proxy_read_timeout 86400;
+            
+            # CORS头
+            add_header 'Access-Control-Allow-Origin' 'https://\$host' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization' always;
+            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+        }
+
+        # Next.js静态资源
+        location /_next/static/ {
+            proxy_pass http://app;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # 静态文件缓存
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            proxy_pass http://app;
         }
 
         # 所有其他请求转发到Next.js应用
@@ -453,6 +461,12 @@ http {
             proxy_set_header X-Forwarded-Proto \$scheme;
             proxy_cache_bypass \$http_upgrade;
             proxy_read_timeout 86400;
+            
+            # CORS头
+            add_header 'Access-Control-Allow-Origin' 'https://\$host' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization' always;
+            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
         }
 
         # 健康检查
@@ -466,9 +480,8 @@ http {
     }
 }
 EOF
-    fi
     
-    log_info "Nginx配置准备完成"
+    log_info "Nginx配置创建完成"
 }
 
 # 安装SSL证书
@@ -477,6 +490,9 @@ install_ssl_certificate() {
     
     # 安装Certbot
     sudo apt install -y certbot python3-certbot-nginx
+    
+    # 停止nginx以释放80端口
+    sudo systemctl stop nginx 2>/dev/null || true
     
     # 获取SSL证书
     sudo certbot certonly --standalone -d $DOMAIN -d www.$DOMAIN --email $EMAIL --agree-tos --no-eff-email --non-interactive
@@ -487,7 +503,7 @@ install_ssl_certificate() {
     sudo ln -sf /etc/letsencrypt/archive/$DOMAIN /opt/apps/inventory-system/nginx/ssl/archive
     
     # 设置自动续期
-    (crontab -l 2>/dev/null; echo "0 2 * * * /usr/bin/certbot renew --quiet") | crontab -
+    (crontab -l 2>/dev/null; echo "0 2 * * * /usr/bin/certbot renew --quiet --deploy-hook 'docker compose -f /opt/apps/inventory-system/docker-compose.yml restart nginx'") | crontab -
     
     log_info "SSL证书安装完成"
 }
@@ -558,11 +574,12 @@ build_and_start() {
     # 进入应用目录
     cd /opt/apps/inventory-system
     
-    # 构建并启动服务
-    docker compose up -d --build
+    # 先只启动应用容器（不启动nginx）
+    log_info "启动应用容器..."
+    docker compose up -d --build app
     
-    # 等待容器启动
-    log_info "等待容器启动..."
+    # 等待应用容器启动
+    log_info "等待应用容器启动..."
     sleep 30
     
     # 初始化数据库
@@ -572,6 +589,16 @@ build_and_start() {
     # 初始化管理员用户
     log_info "初始化管理员用户..."
     docker compose exec app node init-admin.js
+    
+    # 安装SSL证书（如果还没有安装）
+    if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+        log_info "安装SSL证书..."
+        install_ssl_certificate
+    fi
+    
+    # 启动nginx容器
+    log_info "启动nginx容器..."
+    docker compose up -d nginx
     
     log_info "应用启动完成"
 }
@@ -613,7 +640,6 @@ main() {
     create_dockerfile
     create_docker_compose
     create_nginx_config
-    install_ssl_certificate
     build_and_start
     show_deployment_info
     
