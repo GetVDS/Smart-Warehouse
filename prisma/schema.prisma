@@ -7,64 +7,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model Customer {
-  id              String           @id @default(cuid())
-  name            String
-  phone           String           @unique
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  orders          Order[]
-  purchaseRecords PurchaseRecord[]
-}
-
-model Product {
-  id              String           @id @default(cuid())
-  sku             String           @unique
-  currentStock    Int              @default(0)
-  totalOut        Int              @default(0)
-  totalIn         Int              @default(0)
-  price           Float            @default(0)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  orderItems      OrderItem[]
-  purchaseRecords PurchaseRecord[]
+  id             String           @id
+  name           String
+  phone          String           @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  Order          Order[]
+  PurchaseRecord PurchaseRecord[]
 }
 
 model Order {
-  id          String      @id @default(cuid())
+  id          String      @id
   orderNumber Int         @default(0)
   customerId  String
   status      String      @default("pending")
   totalAmount Float       @default(0)
   note        String?
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  customer    Customer    @relation(fields: [customerId], references: [id])
-  orderItems  OrderItem[]
+  updatedAt   DateTime
+  Customer    Customer    @relation(fields: [customerId], references: [id])
+  OrderItem   OrderItem[]
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
+  id        String   @id
   orderId   String
   productId String
   quantity  Int
   price     Float
   createdAt DateTime @default(now())
-  product   Product  @relation(fields: [productId], references: [id])
-  order     Order    @relation(fields: [orderId], references: [id])
+  Product   Product  @relation(fields: [productId], references: [id])
+  Order     Order    @relation(fields: [orderId], references: [id])
+}
+
+model Product {
+  id             String           @id
+  sku            String           @unique
+  currentStock   Int              @default(0)
+  totalOut       Int              @default(0)
+  totalIn        Int              @default(0)
+  price          Float            @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  OrderItem      OrderItem[]
+  PurchaseRecord PurchaseRecord[]
 }
 
 model PurchaseRecord {
-  id           String   @id @default(cuid())
+  id           String   @id
   customerId   String
   productId    String
   quantity     Int
@@ -72,6 +63,15 @@ model PurchaseRecord {
   totalAmount  Float
   purchaseDate DateTime @default(now())
   createdAt    DateTime @default(now())
-  product      Product  @relation(fields: [productId], references: [id])
-  customer     Customer @relation(fields: [customerId], references: [id])
+  Product      Product  @relation(fields: [productId], references: [id])
+  Customer     Customer @relation(fields: [customerId], references: [id])
+}
+
+model User {
+  id        String   @id
+  phone     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
 }
