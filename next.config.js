@@ -35,7 +35,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self' ws: wss:",
+              "connect-src 'self' ws: wss: http://localhost:3000 http://localhost:3002",
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",

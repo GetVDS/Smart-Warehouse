@@ -28,15 +28,21 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  totalAmount?: number;
   createdAt?: string;
   updatedAt?: string;
+  _count?: {
+    orders?: number;
+  };
 }
 
 export interface Order {
   id: string;
+  orderNumber?: number;
   customerId: string;
   status: string;
   totalAmount: number;
+  note?: string;
   createdAt?: string;
   updatedAt?: string;
   customer?: Customer;

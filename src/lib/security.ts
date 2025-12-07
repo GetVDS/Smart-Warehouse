@@ -1,58 +1,51 @@
 import { NextRequest } from 'next/server';
-import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
-
-// 安全配置
-const SECURITY_CONFIG = {
-  // JWT配置
-  JWT_SECRET: process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex'),
-  JWT_EXPIRES_IN: '7d' as const,
-  
-  // 密码策略
-  PASSWORD_MIN_LENGTH: 8,
-  PASSWORD_REQUIRE_UPPERCASE: true,
-  PASSWORD_REQUIRE_LOWERCASE: true,
-  PASSWORD_REQUIRE_NUMBERS: true,
-  PASSWORD_REQUIRE_SYMBOLS: false,
-  
-  // 速率限制
-  RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000, // 15分钟
-  RATE_LIMIT_MAX_REQUESTS: 100, // 每个窗口最多100个请求
-  
-  // 登录限制
-  LOGIN_ATTEMPT_LIMIT: 5,
-  LOGIN_LOCKOUT_TIME_MS: 15 * 60 * 1000, // 15分钟
-  
-  // 会话安全
-  SESSION_TIMEOUT_MS: 7 * 24 * 60 * 60 * 1000, // 7天
-  SECURE_COOKIES: process.env.NODE_ENV === 'production',
-  
-  // CORS配置
-  ALLOWED_ORIGINS: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [process.env.NEXTAUTH_URL || 'https://localhost:3000'])
-    : ['http://localhost:3000'], // 统一使用端口3000
-};
+import { SECURITY_CONFIG } from './config';
+import { verifyJWT, verifyRefreshToken } from './jwt-manager';
 
 // 内存存储（生产环境应使用Redis等外部存储）
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const csrfTokens = new Map<string, { expiresAt: number; userId: string }>();
 
-// 验证JWT令牌
-export function verifyJWT(token: string): any {
-  try {
-    return jwt.verify(token, SECURITY_CONFIG.JWT_SECRET);
-  } catch (error) {
-    return null;
+// 生成CSRF令牌
+export function generateCSRFToken(userId: string): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  csrfTokens.set(token, {
+    userId,
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24小时
+  });
+  return token;
+}
+
+// 验证CSRF令牌
+export function verifyCSRFToken(token: string, userId: string): boolean {
+  const tokenData = csrfTokens.get(token);
+  if (!tokenData) {
+    return false;
   }
+  
+  if (tokenData.userId !== userId) {
+    return false;
+  }
+  
+  if (Date.now() > tokenData.expiresAt) {
+    csrfTokens.delete(token);
+    return false;
+  }
+  
+  return true;
 }
 
-// 生成JWT令牌
-export function generateJWT(payload: any): string {
-  const options: SignOptions = {
-    expiresIn: SECURITY_CONFIG.JWT_EXPIRES_IN,
-  };
-  return jwt.sign(payload, SECURITY_CONFIG.JWT_SECRET, options);
-}
+// 清理过期的CSRF令牌
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, data] of csrfTokens.entries()) {
+    if (now > data.expiresAt) {
+      csrfTokens.delete(token);
+    }
+  }
+}, 60 * 60 * 1000); // 每小时清理一次
 
 // 验证密码强度
 export function validatePassword(password: string): { isValid: boolean; errors: string[] } {
@@ -234,26 +227,35 @@ export async function secureAuth(request: NextRequest): Promise<{
   const token = request.cookies.get('auth-token')?.value;
   
   if (!token) {
-    return { 
-      isValid: false, 
-      error: '未提供认证令牌', 
-      statusCode: 401 
+    return {
+      isValid: false,
+      error: '未提供认证令牌',
+      statusCode: 401
     };
   }
   
   const decoded = verifyJWT(token);
   
   if (!decoded) {
-    return { 
-      isValid: false, 
-      error: '认证令牌无效或已过期', 
-      statusCode: 401 
+    return {
+      isValid: false,
+      error: '认证令牌无效或已过期',
+      statusCode: 401
     };
   }
   
-  return { 
-    isValid: true, 
-    userId: decoded.userId 
+  // 检查令牌类型
+  if (decoded.type !== 'access') {
+    return {
+      isValid: false,
+      error: '令牌类型错误',
+      statusCode: 401
+    };
+  }
+  
+  return {
+    isValid: true,
+    userId: decoded.userId
   };
 }
 
@@ -289,6 +291,47 @@ export function sanitizeData(data: any, removeFields: string[] = ['password', 't
   }
   
   return sanitized;
+}
+
+// 验证刷新令牌的安全方法
+export function secureVerifyRefreshToken(token: string): any {
+  const decoded = verifyRefreshToken(token);
+  
+  if (!decoded) {
+    return null;
+  }
+  
+  return {
+    userId: decoded.userId,
+    phone: decoded.phone
+  };
+}
+
+
+// 验证请求方法
+export function validateRequestMethod(request: NextRequest, allowedMethods: string[]): boolean {
+  return allowedMethods.includes(request.method);
+}
+
+// 验证内容类型
+export function validateContentType(request: NextRequest, allowedTypes: string[]): boolean {
+  const contentType = request.headers.get('content-type');
+  if (!contentType) {
+    return false;
+  }
+  
+  return allowedTypes.some(type => contentType.includes(type));
+}
+
+// 检查请求大小
+export function validateRequestSize(request: NextRequest, maxSizeBytes: number = 10 * 1024 * 1024): boolean {
+  const contentLength = request.headers.get('content-length');
+  if (!contentLength) {
+    return true; // 如果没有content-length头，允许通过
+  }
+  
+  const size = parseInt(contentLength);
+  return size <= maxSizeBytes;
 }
 
 // 导出配置

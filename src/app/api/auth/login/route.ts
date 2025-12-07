@@ -3,11 +3,11 @@ import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { ensureAdminExists } from '@/lib/admin-init';
 import {
-  generateJWT,
   checkLoginAttempts,
   recordLoginAttempt,
   SECURITY_CONFIG
 } from '@/lib/security';
+import { generateTokenPair } from '@/lib/jwt-manager';
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
     // 记录成功的登录尝试
     recordLoginAttempt(cleanPhone, true);
 
-    // 生成JWT token
-    const token = generateJWT({
+    // 生成令牌对
+    const tokenPair = generateTokenPair({
       userId: user.id,
       phone: user.phone
     });
@@ -100,17 +100,19 @@ export async function POST(request: NextRequest) {
         id: user.id,
         phone: user.phone,
         name: user.name
-      }
+      },
+      refreshToken: tokenPair.refreshToken,
+      expiresIn: tokenPair.expiresIn
     }, '登录成功');
 
     const response = NextResponse.json(responseData);
 
-    // 设置安全的HTTP-only cookie
-    response.cookies.set('auth-token', token, {
+    // 设置安全的HTTP-only cookie（仅存储访问令牌）
+    response.cookies.set('auth-token', tokenPair.accessToken, {
       httpOnly: true,
       secure: SECURITY_CONFIG.SECURE_COOKIES,
       sameSite: 'lax',
-      maxAge: SECURITY_CONFIG.SESSION_TIMEOUT_MS / 1000, // 转换为秒
+      maxAge: tokenPair.expiresIn,
       path: '/',
     });
 

@@ -5,7 +5,7 @@ import { useState } from 'react';
 interface CustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddCustomer: (customerData: { name: string; phone: string }) => Promise<void>;
+  onAddCustomer: (customerData: { name: string; phone: string }) => Promise<any>;
 }
 
 export function CustomerModal({ isOpen, onClose, onAddCustomer }: CustomerModalProps) {

@@ -10,7 +10,7 @@ interface OrderModalProps {
     customerId: string;
     items: Array<{productId: string, quantity: number}>;
     note?: string;
-  }) => Promise<void>;
+  }) => Promise<any>;
   customers: Array<{id: string, name: string, phone: string}>;
   products: Array<{id: string, sku: string, currentStock: number}>;
 }

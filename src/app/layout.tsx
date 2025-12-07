@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import BrowserCompatibilityInitializer from "@/components/BrowserCompatibilityInitializer";
+import SecurityInitializer from "@/components/SecurityInitializer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -60,6 +61,7 @@ export default function RootLayout({
       >
         <ErrorBoundary>
           <BrowserCompatibilityInitializer />
+          <SecurityInitializer />
           {children}
           <Toaster />
         </ErrorBoundary>

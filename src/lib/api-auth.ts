@@ -1,5 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { secureAuth, SECURITY_CONFIG, verifyJWT } from './security';
+import { secureAuth, SECURITY_CONFIG } from './security';
+import { verifyJWT } from './jwt-manager';
+import {
+  validateRequestBody,
+  validateRussianPhone,
+  validateProductSKU,
+  validatePrice,
+  validateQuantity,
+  validateCustomerName,
+  validateOrderNote,
+  validateOrderItems,
+  validateEmail,
+  validateURL,
+  validateId,
+  validateDate,
+  validateBoolean,
+  validateStringLength,
+  validateNumberRange,
+  validateArrayLength,
+  validateEnum
+} from './validators';
 
 // 统一的API响应格式
 export const createSuccessResponse = (data: any, message?: string) => ({
@@ -59,159 +79,6 @@ export function validateRequestBody(body: any, requiredFields: string[]): { isVa
   return { isValid: true };
 }
 
-// 验证手机号格式（俄罗斯）
-export function validateRussianPhone(phone: string): { isValid: boolean; error?: string } {
-  if (!phone || typeof phone !== 'string') {
-    return { isValid: false, error: '手机号不能为空' };
-  }
-  
-  // 移除所有非数字字符
-  const cleanPhone = phone.replace(/\D/g, '');
-  
-  // 俄罗斯手机号验证（通常为11位，以7、8或9开头）
-  if (!/^[7-9]\d{10}$/.test(cleanPhone)) {
-    return { isValid: false, error: '请输入有效的俄罗斯手机号（11位数字）' };
-  }
-  
-  return { isValid: true };
-}
-
-// 验证产品SKU
-export function validateProductSKU(sku: string): { isValid: boolean; error?: string } {
-  if (!sku || typeof sku !== 'string') {
-    return { isValid: false, error: '产品款号不能为空' };
-  }
-  
-  if (sku.length < 2 || sku.length > 50) {
-    return { isValid: false, error: '产品款号长度应在2-50个字符之间' };
-  }
-  
-  // 检查是否包含非法字符
-  if (!/^[a-zA-Z0-9\-_\u4e00-\u9fa5]+$/.test(sku)) {
-    return { isValid: false, error: '产品款号只能包含字母、数字、连字符、下划线和中文字符' };
-  }
-  
-  return { isValid: true };
-}
-
-// 验证价格
-export function validatePrice(price: any): { isValid: boolean; error?: string; normalizedPrice?: number } {
-  const numPrice = parseFloat(price);
-  
-  if (isNaN(numPrice)) {
-    return { isValid: false, error: '价格必须是有效数字' };
-  }
-  
-  if (numPrice < 0) {
-    return { isValid: false, error: '价格不能为负数' };
-  }
-  
-  if (numPrice > 999999.99) {
-    return { isValid: false, error: '价格超出允许范围' };
-  }
-  
-  return { 
-    isValid: true, 
-    normalizedPrice: Math.round(numPrice * 100) / 100 // 保留两位小数
-  };
-}
-
-// 验证数量
-export function validateQuantity(quantity: any): { isValid: boolean; error?: string; normalizedQuantity?: number } {
-  const numQuantity = parseInt(quantity);
-  
-  if (isNaN(numQuantity)) {
-    return { isValid: false, error: '数量必须是整数' };
-  }
-  
-  if (numQuantity <= 0) {
-    return { isValid: false, error: '数量必须大于0' };
-  }
-  
-  if (numQuantity > 9999) {
-    return { isValid: false, error: '数量超出允许范围' };
-  }
-  
-  return { isValid: true, normalizedQuantity: numQuantity };
-}
-
-// 验证客户名称
-export function validateCustomerName(name: string): { isValid: boolean; error?: string } {
-  if (!name || typeof name !== 'string') {
-    return { isValid: false, error: '客户姓名不能为空' };
-  }
-  
-  const trimmedName = name.trim();
-  
-  if (trimmedName.length < 2 || trimmedName.length > 100) {
-    return { isValid: false, error: '客户姓名长度应在2-100个字符之间' };
-  }
-  
-  // 检查是否包含非法字符
-  if (!/^[\u4e00-\u9fa5a-zA-Z\s\-']+$/.test(trimmedName)) {
-    return { isValid: false, error: '客户姓名只能包含中文、英文字母、空格、连字符和撇号' };
-  }
-  
-  return { isValid: true };
-}
-
-// 验证订单备注
-export function validateOrderNote(note: string): { isValid: boolean; error?: string; normalizedNote?: string } {
-  if (!note) {
-    return { isValid: true, normalizedNote: '' };
-  }
-  
-  if (typeof note !== 'string') {
-    return { isValid: false, error: '备注必须是字符串' };
-  }
-  
-  const trimmedNote = note.trim();
-  
-  if (trimmedNote.length > 500) {
-    return { isValid: false, error: '备注长度不能超过500个字符' };
-  }
-  
-  return { isValid: true, normalizedNote: trimmedNote };
-}
-
-// 验证订单项
-export function validateOrderItems(items: any[]): { isValid: boolean; error?: string; normalizedItems?: any[] } {
-  if (!Array.isArray(items)) {
-    return { isValid: false, error: '订单项必须是数组' };
-  }
-  
-  if (items.length === 0) {
-    return { isValid: false, error: '至少需要一个订单项' };
-  }
-  
-  if (items.length > 50) {
-    return { isValid: false, error: '订单项数量不能超过50个' };
-  }
-  
-  const normalizedItems: any[] = [];
-  
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    
-    // 验证产品ID
-    if (!item.productId || typeof item.productId !== 'string') {
-      return { isValid: false, error: `第${i + 1}个订单项缺少有效的产品ID` };
-    }
-    
-    // 验证数量
-    const quantityResult = validateQuantity(item.quantity);
-    if (!quantityResult.isValid) {
-      return { isValid: false, error: `第${i + 1}个订单项数量无效: ${quantityResult.error}` };
-    }
-    
-    normalizedItems.push({
-      productId: item.productId,
-      quantity: quantityResult.normalizedQuantity
-    });
-  }
-  
-  return { isValid: true, normalizedItems };
-}
 
 // 添加安全头的辅助函数
 export function addSecurityHeaders(response: NextResponse): NextResponse {
@@ -222,27 +89,35 @@ export function addSecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   
-  // 设置Content Security Policy - 允许eval用于开发环境
+  // 设置Content Security Policy - 根据环境调整安全级别
   const isDevelopment = process.env.NODE_ENV !== 'production';
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 允许eval和内联脚本
-    "style-src 'self' 'unsafe-inline'", // 允许内联样式
+    isDevelopment
+      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+      : "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'", // 允许内联样式（Tailwind需要）
     "img-src 'self' data: https:",
     "font-src 'self' data:",
     "connect-src 'self' ws: wss:", // 允许WebSocket连接
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'"
+    "form-action 'self'",
+    "require-trusted-types-for 'script'" // 启用可信类型
   ].join('; ');
   
   response.headers.set('Content-Security-Policy', cspDirectives);
   
   // 在生产环境中添加HSTS头
   if (process.env.NODE_ENV === 'production') {
-    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
+  
+  // 添加其他安全头
+  response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
   
   return response;
 }
@@ -312,3 +187,23 @@ export async function verifyAuth(request: NextRequest) {
     return null;
   }
 }
+
+// 重新导出所有验证函数以保持向后兼容
+export {
+  validateRussianPhone,
+  validateProductSKU,
+  validatePrice,
+  validateQuantity,
+  validateCustomerName,
+  validateOrderNote,
+  validateOrderItems,
+  validateEmail,
+  validateURL,
+  validateId,
+  validateDate,
+  validateBoolean,
+  validateStringLength,
+  validateNumberRange,
+  validateArrayLength,
+  validateEnum
+};
