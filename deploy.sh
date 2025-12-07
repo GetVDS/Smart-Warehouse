@@ -560,6 +560,8 @@ copy_project_files() {
         sudo cp "$SCRIPT_DIR/fix-prisma-baseline.sh" /opt/apps/inventory-system/
         sudo chmod +x /opt/apps/inventory-system/fix-prisma-baseline.sh
         log_info "✅ Prisma基线化修复脚本已复制"
+    else
+        log_warn "⚠️ 未找到fix-prisma-baseline.sh脚本"
     fi
     
     # 复制Docker相关文件
