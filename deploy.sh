@@ -618,6 +618,13 @@ build_and_start() {
     max_retries=3
     
     while [ $retry_count -lt $max_retries ]; do
+        # 确保数据库目录存在且有正确权限
+        log_info "确保数据库目录存在且有正确权限..."
+        docker compose exec app mkdir -p /app/db || true
+        docker compose exec app mkdir -p /app/prisma/db || true
+        docker compose exec app chmod 755 /app/db || true
+        docker compose exec app chmod 755 /app/prisma/db || true
+        
         # 检查是否需要基线化数据库
         if [ -n "$(ls -A prisma/migrations)" ]; then
             log_info "检测到现有迁移，使用Prisma修复脚本..."
@@ -628,8 +635,19 @@ build_and_start() {
             else
                 log_warn "修复脚本失败，尝试手动基线化..."
                 
-                # 手动基线化
-                if ! docker compose exec app npx prisma migrate baseline 2>/dev/null; then
+                # 手动基线化所有现有迁移
+                for migration_dir in prisma/migrations/*/; do
+                    if [ -f "$migration_dir/migration.sql" ]; then
+                        migration_name=$(basename "$migration_dir")
+                        if [ "$migration_name" != "_prisma_migrations" ]; then
+                            log_info "标记迁移 $migration_name 为已应用..."
+                            docker compose exec app npx prisma migrate resolve --applied "$migration_name" || log_warn "标记迁移 $migration_name 失败，继续..."
+                        fi
+                    fi
+                done
+                
+                # 如果手动基线化失败，重置数据库
+                if ! docker compose exec app npx prisma migrate status > /dev/null 2>&1; then
                     log_warn "基线化失败，重置数据库..."
                     docker compose exec app rm -f /app/db/custom.db 2>/dev/null || true
                     docker compose exec app npx prisma db push --force-reset
