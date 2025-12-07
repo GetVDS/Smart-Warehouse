@@ -185,6 +185,7 @@ JWT_SECRET="$JWT_SECRET"
 NODE_ENV="production"
 NEXTAUTH_URL="https://$DOMAIN"
 NEXTAUTH_SECRET="$(openssl rand -hex 32)"
+NEXT_PUBLIC_API_URL="https://$DOMAIN"
 
 # 安全配置
 SECURE_COOKIES="true"

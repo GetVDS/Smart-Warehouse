@@ -24,9 +24,15 @@ class ApiClient {
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
 
   constructor() {
-    this.baseUrl = process.env.NODE_ENV === 'production'
-      ? (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001')
-      : 'http://localhost:3001';
+    // 使用环境变量配置API基础URL，确保生产环境和开发环境的一致性
+    if (process.env.NODE_ENV === 'production') {
+      // 生产环境使用当前域名或配置的API URL
+      this.baseUrl = process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : '');
+    } else {
+      // 开发环境使用配置的端口，统一为3000
+      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    }
   }
 
   private async request<T = any>(
