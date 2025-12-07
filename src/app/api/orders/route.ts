@@ -18,25 +18,6 @@ export async function GET(request: NextRequest) {
 
     const orders = await db.order.findMany({
       where: whereClause,
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true
-          }
-        },
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                sku: true
-              }
-            }
-          }
-        }
-      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -122,38 +103,31 @@ export async function POST(request: NextRequest) {
       // 创建订单
       const order = await tx.order.create({
         data: {
+          id: `order-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           orderNumber: nextOrderNumber,
           customerId,
           totalAmount,
           status: 'pending',
-          orderItems: {
-            create: orderItems
-          },
-          ...(note && { note }),
-        } as any,
-        include: {
-          orderItems: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  sku: true
-                }
-              }
-            }
-          },
-          customer: {
-            select: {
-              id: true,
-              name: true,
-              phone: true
-            }
-          }
+          updatedAt: new Date(),
+          ...(note && { note })
         }
       });
 
-      // 注意：创建订单时不减少库存，只在确认订单时减少库存
+      // 创建订单项
+      for (const item of orderItems) {
+        await tx.orderItem.create({
+          data: {
+            id: `orderitem-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            orderId: order.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price
+          }
+        });
+      }
 
+      // 注意：创建订单时不减少库存，只在确认订单时减少库存
+      
       return order;
     });
 

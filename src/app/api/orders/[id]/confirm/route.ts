@@ -17,14 +17,7 @@ export async function POST(
 
     // 获取订单详情
     const order = await db.order.findUnique({
-      where: { id: orderId },
-      include: {
-        orderItems: {
-          include: {
-            product: true
-          }
-        }
-      }
+      where: { id: orderId }
     });
 
     if (!order) {
@@ -40,32 +33,19 @@ export async function POST(
       // 更新订单状态
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
-        data: { status: 'confirmed' },
-        include: {
-          orderItems: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  sku: true
-                }
-              }
-            }
-          },
-          customer: {
-            select: {
-              id: true,
-              name: true,
-              phone: true
-            }
-          }
-        }
+        data: { status: 'confirmed' }
+      });
+
+      // 获取订单项以便创建购买记录和更新库存
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId: orderId }
       });
 
       // 创建购买记录
-      for (const item of order.orderItems) {
+      for (const item of orderItems) {
         await tx.purchaseRecord.create({
           data: {
+            id: `purchase-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             customerId: order.customerId,
             productId: item.productId,
             quantity: item.quantity,
@@ -77,7 +57,7 @@ export async function POST(
       }
 
       // 更新产品库存
-      for (const item of order.orderItems) {
+      for (const item of orderItems) {
         const currentProduct = await tx.product.findUnique({
           where: { id: item.productId }
         });
@@ -95,35 +75,16 @@ export async function POST(
             }
           });
         } else {
-          throw new Error(`产品 ${item.product.sku} 库存不足`);
+          throw new Error(`产品库存不足`);
         }
       }
 
       return updatedOrder;
     });
 
-    // 获取更新后的完整订单数据，包括所有关联信息
+    // 获取更新后的完整订单数据
     const completeOrder = await db.order.findUnique({
-      where: { id: orderId },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                sku: true
-              }
-            }
-          }
-        },
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true
-          }
-        }
-      }
+      where: { id: orderId }
     });
 
     // 触发产品数据更新事件，确保产品管理页面的统计数据实时更新

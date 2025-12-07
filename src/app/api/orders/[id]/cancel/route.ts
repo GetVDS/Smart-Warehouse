@@ -17,14 +17,7 @@ export async function POST(
 
     // 获取订单详情
     const order = await db.order.findUnique({
-      where: { id: orderId },
-      include: {
-        orderItems: {
-          include: {
-            product: true
-          }
-        }
-      }
+      where: { id: orderId }
     });
 
     if (!order) {
@@ -38,50 +31,12 @@ export async function POST(
     // 更新订单状态为取消
     const updatedOrder = await db.order.update({
       where: { id: orderId },
-      data: { status: 'cancelled' },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                sku: true
-              }
-            }
-          }
-        },
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true
-          }
-        }
-      }
+      data: { status: 'cancelled' }
     });
 
     // 获取更新后的完整订单数据，确保所有关联信息都包含在内
     const completeOrder = await db.order.findUnique({
-      where: { id: orderId },
-      include: {
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                sku: true
-              }
-            }
-          }
-        },
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true
-          }
-        }
-      }
+      where: { id: orderId }
     });
 
     return NextResponse.json(createSuccessResponse(completeOrder, '订单取消成功'));

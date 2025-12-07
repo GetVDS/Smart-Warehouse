@@ -27,24 +27,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '未认证' }, { status: 401 });
     }
 
-    // 优化查询：使用聚合查询而不是关联查询来避免N+1问题
+    // 获取所有客户基本信息
     const customers = await db.customer.findMany({
       select: {
         id: true,
         name: true,
         phone: true,
         createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            orders: {
-              where: {
-                status: 'confirmed'
-              }
-            },
-            purchaseRecords: true
-          }
-        }
+        updatedAt: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -123,16 +113,10 @@ export async function POST(request: NextRequest) {
     // 创建新客户
     const customer = await db.customer.create({
       data: {
+        id: `customer-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         name,
-        phone
-      },
-      include: {
-        _count: {
-          select: {
-            orders: true,
-            purchaseRecords: true
-          }
-        }
+        phone,
+        updatedAt: new Date()
       }
     });
 

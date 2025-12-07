@@ -41,27 +41,7 @@ export async function GET(
 
     // 获取订单详情
     const order = await db.order.findUnique({
-      where: { id },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            phone: true
-          }
-        },
-        orderItems: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                sku: true,
-                price: true
-              }
-            }
-          }
-        }
-      }
+      where: { id }
     });
 
     if (!order) {
@@ -106,10 +86,7 @@ export async function DELETE(
 
     // 检查订单是否存在
     const existingOrder = await db.order.findUnique({
-      where: { id },
-      include: {
-        orderItems: true
-      }
+      where: { id }
     });
 
     if (!existingOrder) {
@@ -121,11 +98,16 @@ export async function DELETE(
 
     // 使用事务删除订单
     await db.$transaction(async (tx) => {
+      // 获取订单项以便恢复库存
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId: id }
+      });
+
       // 只有当订单状态为"已确认"(confirmed)时，产品已经从库存中售出，删除已确认的订单时不应该恢复库存
       // 如果订单状态为"待处理"(pending)，则需要恢复库存
       if (existingOrder.status === 'pending') {
         // 恢复产品库存
-        for (const item of existingOrder.orderItems) {
+        for (const item of orderItems) {
           await tx.product.update({
             where: { id: item.productId },
             data: {

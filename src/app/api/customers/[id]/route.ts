@@ -39,17 +39,9 @@ export async function GET(
       );
     }
 
-    // 获取客户详情，包括订单和购买记录的数量
+    // 获取客户详情
     const customer = await db.customer.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            orders: true,
-            purchaseRecords: true
-          }
-        }
-      }
+      where: { id }
     });
 
     if (!customer) {
@@ -143,14 +135,6 @@ export async function PUT(
       data: {
         name,
         phone
-      },
-      include: {
-        _count: {
-          select: {
-            orders: true,
-            purchaseRecords: true
-          }
-        }
       }
     });
 
@@ -191,15 +175,7 @@ export async function DELETE(
 
     // 检查客户是否存在
     const existingCustomer = await db.customer.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            orders: true,
-            purchaseRecords: true
-          }
-        }
-      }
+      where: { id }
     });
 
     if (!existingCustomer) {
@@ -211,10 +187,10 @@ export async function DELETE(
 
     // 使用事务处理删除操作，确保数据一致性
     await db.$transaction(async (tx) => {
-      // 获取客户的所有订单
+      // 获取客户的所有订单ID
       const orders = await tx.order.findMany({
         where: { customerId: id },
-        include: { orderItems: true }
+        select: { id: true }
       });
 
       // 删除所有订单项

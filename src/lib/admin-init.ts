@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 // 硬编码的管理员信息
 const ADMIN_INFO = {
+  id: 'admin-user-001',
   phone: '79122706664',
   password: 'PRAISEJEANS.888',
   name: 'PRAISEJEANS管理员'
@@ -23,9 +24,11 @@ export async function ensureAdminExists() {
       const hashedPassword = await bcrypt.hash(ADMIN_INFO.password, 10);
       adminUser = await db.user.create({
         data: {
+          id: ADMIN_INFO.id,
           phone: ADMIN_INFO.phone,
           password: hashedPassword,
-          name: ADMIN_INFO.name
+          name: ADMIN_INFO.name,
+          updatedAt: new Date()
         }
       });
       

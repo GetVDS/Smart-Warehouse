@@ -62,11 +62,13 @@ export async function POST(request: NextRequest) {
     // 创建新产品
     const product = await db.product.create({
       data: {
+        id: `product-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         sku,
         currentStock: parseInt(initialStock),
         totalIn: parseInt(initialStock),
         totalOut: 0,
-        price: parseFloat(price)
+        price: parseFloat(price),
+        updatedAt: new Date()
       }
     });
 

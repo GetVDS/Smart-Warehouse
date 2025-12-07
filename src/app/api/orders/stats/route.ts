@@ -37,18 +37,18 @@ export async function POST(request: NextRequest) {
           lt: endDate ? new Date(endDate) : undefined
         },
         status: 'confirmed'
-      },
-      include: {
-        orderItems: true,
-        customer: true
       }
+    });
+
+    // 获取订单项以便计算数量
+    const orderIds = orders.map(order => order.id);
+    const orderItems = await db.orderItem.findMany({
+      where: { orderId: { in: orderIds } }
     });
 
     // 计算统计数据
     const totalAmount = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-    const totalQuantity = orders.reduce((sum, order) => {
-      return sum + order.orderItems.reduce((itemSum, item) => itemSum + item.quantity, 0);
-    }, 0);
+    const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
     
     // 获取唯一客户数量
     const uniqueCustomers = new Set(orders.map(order => order.customerId));
