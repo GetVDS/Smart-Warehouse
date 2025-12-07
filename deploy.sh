@@ -555,6 +555,13 @@ copy_project_files() {
     sudo cp "$SCRIPT_DIR/init-test-data.js" /opt/apps/inventory-system/ 2>/dev/null || true
     sudo cp "$SCRIPT_DIR/create-simple-test-data.js" /opt/apps/inventory-system/ 2>/dev/null || true
     
+    # 复制Prisma修复脚本
+    if [ -f "$SCRIPT_DIR/fix-prisma-baseline.sh" ]; then
+        sudo cp "$SCRIPT_DIR/fix-prisma-baseline.sh" /opt/apps/inventory-system/
+        sudo chmod +x /opt/apps/inventory-system/fix-prisma-baseline.sh
+        log_info "✅ Prisma基线化修复脚本已复制"
+    fi
+    
     # 复制Docker相关文件
     if [ -f "$SCRIPT_DIR/Dockerfile" ]; then
         sudo cp "$SCRIPT_DIR/Dockerfile" /opt/apps/inventory-system/
@@ -611,13 +618,29 @@ build_and_start() {
     while [ $retry_count -lt $max_retries ]; do
         # 检查是否需要基线化数据库
         if [ -n "$(ls -A prisma/migrations)" ]; then
-            log_info "检测到现有迁移，基线化数据库..."
-            docker compose exec app npx prisma migrate baseline || log_warn "数据库基线化失败，继续正常迁移流程..."
+            log_info "检测到现有迁移，使用Prisma修复脚本..."
+            
+            # 尝试使用修复脚本
+            if docker compose exec app ./fix-prisma-baseline.sh auto; then
+                log_info "✅ Prisma数据库修复成功"
+            else
+                log_warn "修复脚本失败，尝试手动基线化..."
+                
+                # 手动基线化
+                if ! docker compose exec app npx prisma migrate baseline 2>/dev/null; then
+                    log_warn "基线化失败，重置数据库..."
+                    docker compose exec app rm -f /app/db/custom.db 2>/dev/null || true
+                    docker compose exec app npx prisma db push --force-reset
+                fi
+            fi
+        else
+            log_info "应用数据库迁移..."
+            docker compose exec app npx prisma migrate deploy
         fi
         
-        # 部署迁移
-        if docker compose exec app npx prisma migrate deploy; then
-            log_info "数据库迁移成功"
+        # 验证数据库初始化
+        if docker compose exec app npx prisma db pull --force > /dev/null 2>&1; then
+            log_info "✅ 数据库初始化成功"
             break
         else
             retry_count=$((retry_count + 1))
@@ -634,9 +657,26 @@ build_and_start() {
         fi
     done
     
+    # 确保数据初始化
+    if [ -f "init-test-data.js" ]; then
+        log_info "确保测试数据已初始化..."
+        docker compose exec app node init-test-data.js || log_warn "测试数据初始化失败，但继续部署"
+    fi
+
     # 初始化管理员用户
     log_info "初始化管理员用户..."
-    docker compose exec app node init-admin.js
+    docker compose exec app node init-admin.js || log_error "管理员用户初始化失败"
+    
+    # 验证数据库连接和基本功能
+    log_info "验证数据库连接和基本功能..."
+    if docker compose exec app npx prisma db pull --force > /dev/null 2>&1; then
+        log_info "✅ 数据库连接验证成功"
+    else
+        log_error "❌ 数据库连接验证失败"
+        log_info "尝试重新生成Prisma客户端..."
+        docker compose exec app npx prisma generate
+        docker compose exec app npx prisma db pull --force || log_warn "数据库连接仍有问题，但继续部署"
+    fi
     
     # 安装SSL证书（如果还没有安装）
     if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then

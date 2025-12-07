@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const ADMIN_INFO = {
+  id: 'admin-user-001',
   phone: '79122706664',
   password: 'PRAISEJEANS.888',
   name: 'PRAISEJEANS管理员'
@@ -25,9 +26,11 @@ async function initAdmin() {
       const hashedPassword = await bcrypt.hash(ADMIN_INFO.password, 10);
       adminUser = await prisma.user.create({
         data: {
+          id: ADMIN_INFO.id,
           phone: ADMIN_INFO.phone,
           password: hashedPassword,
-          name: ADMIN_INFO.name
+          name: ADMIN_INFO.name,
+          updatedAt: new Date()
         }
       });
       
