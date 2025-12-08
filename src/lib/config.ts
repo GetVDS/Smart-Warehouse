@@ -16,8 +16,8 @@ export const PORT_CONFIG = {
 export const SECURITY_CONFIG = {
   // JWT配置
   JWT_SECRET: process.env.JWT_SECRET || crypto.randomBytes(32).toString('base64'),
-  JWT_EXPIRES_IN: '15m', // 字符串格式，jsonwebtoken会自动解析
-  JWT_REFRESH_EXPIRES_IN: '7d', // 字符串格式，jsonwebtoken会自动解析
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m', // 字符串格式，jsonwebtoken会自动解析
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d', // 字符串格式，jsonwebtoken会自动解析
   
   // 密码配置
   BCRYPT_ROUNDS: 10,
