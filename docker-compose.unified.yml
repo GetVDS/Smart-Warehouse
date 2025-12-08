@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: ${BUILD_TARGET:-production}
+      target: ${BUILD_TARGET:-runner}
     ports:
       - "${APP_PORT:-3000}:3000"
     environment:

@@ -94,7 +94,17 @@ pre_deploy_checks() {
     fi
     
     # 检查端口可用性
-    if netstat -tuln | grep -q ":3000 "; then
+    # 检查端口可用性 - 使用多种方法
+    local port_in_use=false
+    if command -v netstat &> /dev/null && netstat -tuln | grep -q ":3000 "; then
+        port_in_use=true
+    elif command -v ss &> /dev/null && ss -tuln | grep -q ":3000 "; then
+        port_in_use=true
+    elif command -v lsof &> /dev/null && lsof -i :3000 &> /dev/null; then
+        port_in_use=true
+    fi
+    
+    if [ "$port_in_use" = true ]; then
         log_warn "端口3000已被占用，将尝试停止现有服务"
         docker compose -f docker-compose.unified.yml down || true
         sleep 5
@@ -259,7 +269,7 @@ performance_test() {
     local response_time=$(curl -o /dev/null -s -w '%{time_total}' http://localhost:3000/api/health)
     log_info "API响应时间: ${response_time}s"
     
-    if (( $(echo "$response_time > 2.0" | bc -l) )); then
+    if command -v bc &> /dev/null && (( $(echo "$response_time > 2.0" | bc -l) )); then
         log_warn "响应时间较慢，建议优化"
     fi
     
