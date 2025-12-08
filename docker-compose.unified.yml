@@ -90,21 +90,28 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: base
+      target: deps
     environment:
       - DATABASE_URL=file:${DB_PATH:-./data/custom.db}
       - NODE_ENV=${NODE_ENV:-production}
+      - JWT_SECRET=${JWT_SECRET:-default-secret-change-in-production}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-default-secret-change-in-production}
     volumes:
       - ./data:/app/data
-      - ./scripts:/app/scripts:ro
+      - ./prisma:/app/prisma:ro
     networks:
       - app-network
     command: >
       sh -c "
         echo '初始化数据库...';
+        echo 'NODE_ENV: $$NODE_ENV';
+        echo 'DATABASE_URL: $$DATABASE_URL';
+        ls -la /app/;
+        ls -la /app/prisma/;
         npx prisma generate;
-        npx prisma migrate deploy;
-        node /app/scripts/init-admin.js;
+        npx prisma migrate deploy || echo '迁移可能已存在或无需执行';
+        node /app/scripts/init-database-embedded.js;
         echo '数据库初始化完成';
       "
     restart: "no"

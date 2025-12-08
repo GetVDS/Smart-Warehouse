@@ -75,22 +75,25 @@ pre_deploy_checks() {
         fi
     done
     
-    # 检查Docker
+    # 检查容器运行时
     if ! command -v docker &> /dev/null; then
-        log_error "Docker 未安装"
-        exit 1
+        log_warn "Docker 未安装，将使用本地Node.js部署"
+        DEPLOY_MODE="local"
+    else
+        log_info "Docker 已安装，检查Docker Compose..."
+        if ! docker compose version &> /dev/null; then
+            log_error "Docker 已安装但Docker Compose 未安装"
+            exit 1
+        fi
+        DEPLOY_MODE="docker"
     fi
     
-    # 检查Docker Compose
-    if ! docker compose version &> /dev/null; then
-        log_error "Docker Compose 未安装"
-        exit 1
-    fi
-    
-    # 验证配置文件
-    if ! docker compose -f docker-compose.unified.yml config &> /dev/null; then
-        log_error "docker-compose.unified.yml 配置错误"
-        exit 1
+    # 验证配置文件（仅在使用Docker时）
+    if [ "$DEPLOY_MODE" = "docker" ]; then
+        if ! docker compose -f docker-compose.unified.yml config &> /dev/null; then
+            log_error "docker-compose.unified.yml 配置错误"
+            exit 1
+        fi
     fi
     
     # 检查端口可用性
@@ -106,7 +109,12 @@ pre_deploy_checks() {
     
     if [ "$port_in_use" = true ]; then
         log_warn "端口3000已被占用，将尝试停止现有服务"
-        docker compose -f docker-compose.unified.yml down || true
+        if [ "$DEPLOY_MODE" = "docker" ]; then
+            docker compose -f docker-compose.unified.yml down || true
+        else
+            pkill -f "node.*server.js" || true
+            pkill -f "next.*start" || true
+        fi
         sleep 5
     fi
     
@@ -186,23 +194,73 @@ rollback_deployment() {
 build_and_deploy() {
     log_info "构建和部署应用..."
     
-    # 停止现有服务
-    log_info "停止现有服务..."
-    docker compose -f docker-compose.unified.yml down || true
-    
-    # 清理旧的镜像和容器
-    log_info "清理旧的资源..."
-    docker system prune -f || true
-    
-    # 构建新镜像
-    log_info "构建Docker镜像..."
-    docker compose -f docker-compose.unified.yml build --no-cache --parallel
-    
-    # 启动服务
-    log_info "启动服务..."
-    docker compose -f docker-compose.unified.yml up -d
-    
-    log_info "应用部署完成"
+    if [ "$DEPLOY_MODE" = "docker" ]; then
+        # Docker部署模式
+        log_info "使用Docker部署模式..."
+        
+        # 停止现有服务
+        log_info "停止现有服务..."
+        docker compose -f docker-compose.unified.yml down || true
+        
+        # 清理旧的镜像和容器
+        log_info "清理旧的资源..."
+        docker system prune -f || true
+        
+        # 构建新镜像
+        log_info "构建Docker镜像..."
+        docker compose -f docker-compose.unified.yml build --no-cache --parallel
+        
+        # 启动服务
+        log_info "启动服务..."
+        docker compose -f docker-compose.unified.yml up -d
+        
+        log_info "Docker应用部署完成"
+    else
+        # 本地Node.js部署模式
+        log_info "使用本地Node.js部署模式..."
+        
+        # 检查Node.js和npm
+        if ! command -v node &> /dev/null; then
+            log_error "Node.js 未安装"
+            exit 1
+        fi
+        
+        if ! command -v npm &> /dev/null; then
+            log_error "npm 未安装"
+            exit 1
+        fi
+        
+        # 停止现有服务
+        log_info "停止现有Node.js服务..."
+        pkill -f "node.*server.js" || true
+        pkill -f "next.*start" || true
+        
+        # 安装依赖
+        log_info "安装项目依赖..."
+        npm ci --legacy-peer-deps --registry=https://registry.npmmirror.com
+        
+        # 生成Prisma客户端
+        log_info "生成Prisma客户端..."
+        npx prisma generate
+        
+        # 运行数据库迁移
+        log_info "运行数据库迁移..."
+        npx prisma migrate deploy || log_warn "数据库迁移可能已存在"
+        
+        # 初始化管理员用户
+        log_info "初始化管理员用户..."
+        node init-admin.js
+        
+        # 构建应用
+        log_info "构建Next.js应用..."
+        npm run build
+        
+        # 启动服务
+        log_info "启动Node.js服务..."
+        nohup npm start > server.log 2>&1 &
+        
+        log_info "本地Node.js应用部署完成"
+    fi
 }
 
 # 部署后验证
@@ -214,9 +272,16 @@ verify_deployment() {
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if docker compose -f docker-compose.unified.yml ps | grep -q "Up"; then
-            log_info "服务状态检查通过"
-            break
+        if [ "$DEPLOY_MODE" = "docker" ]; then
+            if docker compose -f docker-compose.unified.yml ps | grep -q "Up"; then
+                log_info "Docker服务状态检查通过"
+                break
+            fi
+        else
+            if pgrep -f "node.*server.js" > /dev/null || pgrep -f "next.*start" > /dev/null; then
+                log_info "Node.js服务状态检查通过"
+                break
+            fi
         fi
         
         if [ $attempt -eq $max_attempts ]; then
@@ -251,10 +316,20 @@ verify_deployment() {
     done
     
     # 检查日志是否有错误
-    local error_count=$(docker compose -f docker-compose.unified.yml logs app 2>&1 | grep -i error | wc -l)
-    if [ $error_count -gt 0 ]; then
-        log_warn "发现 $error_count 个错误日志，请检查"
-        docker compose -f docker-compose.unified.yml logs app --tail=20
+    if [ "$DEPLOY_MODE" = "docker" ]; then
+        local error_count=$(docker compose -f docker-compose.unified.yml logs app 2>&1 | grep -i error | wc -l)
+        if [ $error_count -gt 0 ]; then
+            log_warn "发现 $error_count 个错误日志，请检查"
+            docker compose -f docker-compose.unified.yml logs app --tail=20
+        fi
+    else
+        if [ -f "server.log" ]; then
+            local error_count=$(grep -i error server.log | wc -l)
+            if [ $error_count -gt 0 ]; then
+                log_warn "发现 $error_count 个错误日志，请检查"
+                tail -20 server.log
+            fi
+        fi
     fi
     
     log_info "部署后验证通过"

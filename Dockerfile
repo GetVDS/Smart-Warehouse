@@ -7,15 +7,18 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat curl
 WORKDIR /app
 
-# 复制package文件
+# 复制package文件和脚本
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY scripts ./scripts/
 
 # 安装所有依赖（包括开发依赖，因为构建需要）
 RUN npm ci --legacy-peer-deps --registry=https://registry.npmmirror.com && npm cache clean --force
 
-# 安装额外的生产依赖
-RUN npm install bcryptjs --registry=https://registry.npmmirror.com
+# 确保生产依赖完整性
+RUN npm ls bcryptjs || npm install bcryptjs --registry=https://registry.npmmirror.com
+RUN npm ls jsonwebtoken || npm install jsonwebtoken --registry=https://registry.npmmirror.com
+RUN npm ls @prisma/client || npm install @prisma/client --registry=https://registry.npmmirror.com
 
 # 构建阶段
 FROM base AS builder
@@ -58,8 +61,9 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # 复制必要的生产依赖
-COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json ./package-lock.json
 
 # 创建数据库目录
 RUN mkdir -p db && chown -R nextjs:nodejs db
