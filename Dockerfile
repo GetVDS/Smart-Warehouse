@@ -12,10 +12,10 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # 安装所有依赖（包括开发依赖，因为构建需要）
-RUN npm ci --legacy-peer-deps && npm cache clean --force
+RUN npm ci --legacy-peer-deps --registry=https://registry.npmmirror.com && npm cache clean --force
 
 # 安装额外的生产依赖
-RUN npm install bcryptjs
+RUN npm install bcryptjs --registry=https://registry.npmmirror.com
 
 # 构建阶段
 FROM base AS builder
