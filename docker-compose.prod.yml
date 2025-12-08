@@ -10,7 +10,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:./db/custom.db
+      - DATABASE_URL=file:./prisma/db/custom.db
       - JWT_SECRET=${JWT_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -29,7 +29,7 @@ services:
       - MAX_CONNECTIONS=10
       - ERROR_WEBHOOK_URL=${ERROR_WEBHOOK_URL}
     volumes:
-      - ./db:/app/db
+      - ./prisma/db:/app/prisma/db
       - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:

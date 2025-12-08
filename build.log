@@ -1,0 +1,34 @@
+
+> nextjs_tailwind_shadcn_ts@0.1.0 build
+> next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
+
+   ▲ Next.js 15.5.7
+   - Environments: .env.local, .env.production, .env
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+ ⚠ Found lockfile missing swc dependencies, patching...
+ ⚠ Found lockfile missing swc dependencies, patching...
+ ⚠ Found lockfile missing swc dependencies, patching...
+ ✓ Compiled successfully in 1859ms
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/lib/db-optimizer.ts:306:23
+Type error: Type '{ Customer?: { select: { id: true; name: true; phone: true; }; } | undefined; OrderItem?: { select: { id: true; quantity: true; price: true; productId: true; Product: { select: { id: true; sku: true; name: true; }; }; }; } | undefined; ... 7 more ...; customerId: boolean; }' is not assignable to type 'OrderSelect<DefaultArgs>'.
+  Types of property 'OrderItem' are incompatible.
+    Type '{ select: { id: true; quantity: true; price: true; productId: true; Product: { select: { id: true; sku: true; name: true; }; }; }; }' is not assignable to type 'boolean | Order$OrderItemArgs<DefaultArgs> | undefined'.
+      The types of 'select.Product' are incompatible between these types.
+        Type '{ select: { id: true; sku: true; name: true; }; }' is not assignable to type 'boolean | ProductDefaultArgs<DefaultArgs> | undefined'.
+          Types of property 'select' are incompatible.
+            Object literal may only specify known properties, and 'name' does not exist in type 'ProductSelect<DefaultArgs>'.
+
+[0m [90m 304 |[39m                       id[33m:[39m [36mtrue[39m[33m,[39m
+ [90m 305 |[39m                       sku[33m:[39m [36mtrue[39m[33m,[39m
+[31m[1m>[22m[39m[90m 306 |[39m                       name[33m:[39m [36mtrue[39m [90m// 注意：当前schema没有name字段[39m
+ [90m     |[39m                       [31m[1m^[22m[39m
+ [90m 307 |[39m                     }
+ [90m 308 |[39m                   }
+ [90m 309 |[39m                 }[0m
+Next.js build worker exited with code: 1 and signal: null

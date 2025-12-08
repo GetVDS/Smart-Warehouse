@@ -5,6 +5,7 @@ import { Order } from '@/types';
 
 interface OrderListProps {
   orders: Order[];
+  searchTerm?: string;
   onConfirmOrder: (id: string) => void;
   onCancelOrder: (id: string) => void;
   onDeleteOrder: (id: string) => void;

@@ -30,8 +30,8 @@ class ApiClient {
       this.baseUrl = process.env.NEXT_PUBLIC_API_URL ||
         (typeof window !== 'undefined' ? window.location.origin : '');
     } else {
-      // 开发环境使用配置的端口，统一为3002
-      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+      // 开发环境统一使用3000端口
+      this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
     }
   }
 

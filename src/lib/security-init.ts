@@ -1,5 +1,6 @@
 import { validateSecurityConfig, SECURITY_CONFIG } from './config';
 import { logger } from './logger';
+import { readFileSync, existsSync } from 'fs';
 
 // 安全配置初始化
 export function initializeSecurity(): void {
@@ -139,11 +140,10 @@ export function performSecurityCheck(): { isSecure: boolean; issues: string[] } 
 
   // 检查依赖包安全性（简化版）
   try {
-    const fs = require('fs');
     const packagePath = './package.json';
     
-    if (fs.existsSync(packagePath)) {
-      const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    if (existsSync(packagePath)) {
+      const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
       
       // 检查已知有问题的包版本
       const vulnerablePackages = {

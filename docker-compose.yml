@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=file:./db/custom.db
+      - DATABASE_URL=file:./prisma/db/custom.db
       - NODE_ENV=production
       - JWT_SECRET=your-jwt-secret-change-this-in-production
       - NEXTAUTH_URL=https://your-domain.com
@@ -25,7 +25,7 @@ services:
       - ENABLE_CONNECTION_POOL=true
       - MAX_CONNECTIONS=10
     volumes:
-      - ./db:/app/db
+      - ./prisma/db:/app/prisma/db
       - ./logs:/app/logs
     restart: unless-stopped
     networks:

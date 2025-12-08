@@ -1,5 +1,7 @@
 import { db } from './db';
 import { logger } from './logger';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 // 数据库迁移接口
 interface Migration {
@@ -207,7 +209,7 @@ class DatabaseMigrationManager {
       
       logger.info(`迁移 ${migration.name} 已记录`);
     } catch (error) {
-      logger.error('记录迁移失败:', error);
+      logger.error('记录迁移失败:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -291,7 +293,7 @@ class DatabaseMigrationManager {
       
       logger.info('数据库迁移完成');
     } catch (error) {
-      logger.error('数据库迁移失败:', error);
+      logger.error('数据库迁移失败:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -381,7 +383,6 @@ export class DatabaseBackupManager {
     
     try {
       // 确保备份目录存在
-      const fs = require('fs').promises;
       await fs.mkdir(this.backupPath, { recursive: true });
       
       // 复制数据库文件
@@ -403,7 +404,6 @@ export class DatabaseBackupManager {
   // 恢复数据库备份
   async restoreBackup(backupFile: string): Promise<void> {
     try {
-      const fs = require('fs').promises;
       
       // 验证备份文件存在
       await fs.access(backupFile);
@@ -435,21 +435,19 @@ export class DatabaseBackupManager {
     createdAt: Date;
   }>> {
     try {
-      const fs = require('fs').promises;
-      const path = require('path');
       
       const files = await fs.readdir(this.backupPath);
       const backups = [];
       
       for (const file of files) {
         if (file.startsWith('backup_') && file.endsWith('.db')) {
-          const fullPath = path.join(this.backupPath, file);
+          const fullPath = join(this.backupPath, file);
           const stats = await fs.stat(fullPath);
           
           // 从文件名提取时间戳
           const timestampMatch = file.match(/backup_(.+?)(?:_.*)?\.db/);
           if (timestampMatch) {
-            const timestamp = timestampMatch[1].replace(/-/g, ':');
+            const timestamp = timestampMatch[1]?.replace(/-/g, ':') || '';
             backups.push({
               filename: file,
               path: fullPath,

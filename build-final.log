@@ -1,0 +1,28 @@
+
+> nextjs_tailwind_shadcn_ts@0.1.0 build
+> next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/
+
+   ▲ Next.js 15.5.7
+   - Environments: .env.local, .env.production, .env
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+ ⚠ Found lockfile missing swc dependencies, patching...
+ ⚠ Found lockfile missing swc dependencies, patching...
+ ⚠ Found lockfile missing swc dependencies, patching...
+ ✓ Compiled successfully in 1892ms
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/lib/jwt-manager.ts:53:5
+Type error: Type 'string' is not assignable to type 'number | StringValue | undefined'.
+
+[0m [90m 51 |[39m
+ [90m 52 |[39m   [36mconst[39m options[33m:[39m [33mSignOptions[39m [33m=[39m {
+[31m[1m>[22m[39m[90m 53 |[39m     expiresIn[33m:[39m [33mSECURITY_CONFIG[39m[33m.[39m[33mJWT_EXPIRES_IN[39m [36mas[39m string[33m,[39m
+ [90m    |[39m     [31m[1m^[22m[39m
+ [90m 54 |[39m     issuer[33m:[39m [33mSECURITY_CONFIG[39m[33m.[39m[33mNEXTAUTH_URL[39m[33m,[39m
+ [90m 55 |[39m     audience[33m:[39m [33mSECURITY_CONFIG[39m[33m.[39m[33mNEXTAUTH_URL[39m[33m,[39m
+ [90m 56 |[39m   }[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null

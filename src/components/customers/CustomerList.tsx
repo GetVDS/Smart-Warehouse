@@ -6,6 +6,7 @@ import { Customer } from '@/types';
 
 interface CustomerListProps {
   customers: Customer[];
+  searchTerm?: string;
   onDeleteCustomer: (id: string, name: string) => void;
 }
 

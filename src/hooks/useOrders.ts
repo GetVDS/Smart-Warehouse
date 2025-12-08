@@ -19,12 +19,17 @@ export interface Order {
   };
   orderItems: {
     id: string;
+    orderId: string;
     productId: string;
     quantity: number;
     price: number;
     product: {
       id: string;
       sku: string;
+      currentStock: number;
+      totalOut: number;
+      totalIn: number;
+      price: number;
     };
   }[];
 }

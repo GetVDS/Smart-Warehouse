@@ -119,10 +119,18 @@ export default function OrdersPageRefactored() {
       const product = products.find(p => p.id === item.productId);
       return {
         id: `temp-item-${Date.now()}-${Math.random()}`,
+        orderId: tempOrderId,
         productId: item.productId,
         quantity: item.quantity,
         price: product?.price || 0,
-        product: product || { id: item.productId, sku: 'Unknown' }
+        product: product || {
+          id: item.productId,
+          sku: 'Unknown',
+          currentStock: 0,
+          totalOut: 0,
+          totalIn: 0,
+          price: 0
+        }
       };
     });
 

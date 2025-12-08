@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      # 数据库配置
+      - DATABASE_URL=file:${DB_PATH:-./data/custom.db}
+      - DB_PATH=${DB_PATH:-./data}
+      - DB_BACKUP_PATH=${DB_BACKUP_PATH:-./data/backups}
+      
+      # 应用配置
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      
+      # 安全配置
+      - JWT_SECRET=${JWT_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      
+      # 性能配置
+      - NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=2048}
+      - NEXT_TELEMETRY_DISABLED=1
+      
+      # 监控配置
+      - ENABLE_MONITORING=${ENABLE_MONITORING:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ENABLE_SECURITY_LOGGING=${ENABLE_SECURITY_LOGGING:-true}
+      - ENABLE_QUERY_MONITORING=${ENABLE_QUERY_MONITORING:-true}
+      - SLOW_QUERY_THRESHOLD=${SLOW_QUERY_THRESHOLD:-1000}
+      - MAX_CONNECTIONS=${MAX_CONNECTIONS:-10}
+      
+      # API配置
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORY_LIMIT:-1G}
+          cpus: '${APP_CPU_LIMIT:-0.5}'
+        reservations:
+          memory: ${APP_MEMORY_RESERVATION:-512M}
+          cpus: '${APP_CPU_RESERVATION:-0.25}'
+    depends_on:
+      - db-init
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/ssl:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: ${NGINX_MEMORY_LIMIT:-512M}
+          cpus: '${NGINX_CPU_LIMIT:-0.25}'
+        reservations:
+          memory: ${NGINX_MEMORY_RESERVATION:-256M}
+          cpus: '${NGINX_CPU_RESERVATION:-0.1}'
+
+  db-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    environment:
+      - DATABASE_URL=file:${DB_PATH:-./data/custom.db}
+      - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      - ./data:/app/data
+      - ./scripts:/app/scripts:ro
+    networks:
+      - app-network
+    command: >
+      sh -c "
+        echo '初始化数据库...';
+        npx prisma generate;
+        npx prisma migrate deploy;
+        node /app/scripts/init-admin.js;
+        echo '数据库初始化完成';
+      "
+    restart: "no"
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  data:
+    driver: local
+  logs:
+    driver: local

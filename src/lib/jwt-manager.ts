@@ -50,7 +50,7 @@ export function generateAccessToken(payload: Omit<JWTPayload, 'type' | 'jti'>): 
   };
 
   const options: SignOptions = {
-    expiresIn: SECURITY_CONFIG.JWT_EXPIRES_IN as string,
+    expiresIn: SECURITY_CONFIG.JWT_EXPIRES_IN,
     issuer: SECURITY_CONFIG.NEXTAUTH_URL,
     audience: SECURITY_CONFIG.NEXTAUTH_URL,
   };
@@ -68,7 +68,7 @@ export function generateRefreshToken(payload: Omit<JWTPayload, 'type' | 'jti'>):
   };
 
   const options: SignOptions = {
-    expiresIn: SECURITY_CONFIG.JWT_REFRESH_EXPIRES_IN as string,
+    expiresIn: SECURITY_CONFIG.JWT_REFRESH_EXPIRES_IN,
     issuer: SECURITY_CONFIG.NEXTAUTH_URL,
     audience: SECURITY_CONFIG.NEXTAUTH_URL,
   };

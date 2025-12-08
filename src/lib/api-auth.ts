@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { secureAuth, SECURITY_CONFIG } from './security';
 import { verifyJWT } from './jwt-manager';
 import {
-  validateRequestBody,
   validateRussianPhone,
   validateProductSKU,
   validatePrice,

@@ -241,9 +241,11 @@ export const initializeCompatibility = (): void => {
 };
 
 // 导出默认配置
-export default {
+const browserCompatibility = {
   safeGlobalAccess,
   browserDetection,
   errorHandler,
   initializeCompatibility
 };
+
+export default browserCompatibility;

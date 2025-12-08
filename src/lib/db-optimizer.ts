@@ -302,8 +302,7 @@ export class OptimizedDB {
                   Product: {
                     select: {
                       id: true,
-                      sku: true,
-                      name: true // 注意：当前schema没有name字段
+                      sku: true
                     }
                   }
                 }
