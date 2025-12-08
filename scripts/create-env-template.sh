@@ -99,7 +99,7 @@ SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=noreply@example.com
 SMTP_PASS=your-smtp-password
-SMTP_FROM=智慧库存系统 <noreply@example.com>
+SMTP_FROM="智慧库存系统 <noreply@example.com>"
 
 # Redis配置（可选，用于缓存和会话）
 REDIS_URL=redis://localhost:6379
