@@ -19,6 +19,9 @@ git checkout main
 
 ```bash
 # 复制环境变量模板
+# 如果 .env.template 文件不存在，请先运行以下命令生成：
+./scripts/create-env-template.sh
+
 cp .env.template .env.production
 
 # 编辑配置文件

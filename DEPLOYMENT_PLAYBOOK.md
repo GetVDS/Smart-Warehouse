@@ -92,6 +92,9 @@ ls -la src/lib/
 
 ```bash
 # 复制模板文件
+# 如果 .env.template 文件不存在，请先运行以下命令生成：
+./scripts/create-env-template.sh
+
 cp .env.template .env.production
 
 # 编辑生产环境配置
