@@ -97,7 +97,7 @@ const performanceMonitor = new PerformanceMonitor();
 
 // React性能优化Hooks
 export function usePerformanceOptimization() {
-  const renderStartTime = useRef<number | undefined>();
+  const renderStartTime = useRef<number | undefined>(undefined);
   const componentName = useRef<string>('Unknown');
 
   const startRender = useCallback((name: string) => {
@@ -121,7 +121,7 @@ export function useDebounce<T extends (...args: any[]) => any>(
   func: T,
   delay: number
 ): T {
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   return useCallback((...args: Parameters<T>) => {
     if (timeoutRef.current) {
@@ -300,7 +300,7 @@ export function useImageLazyLoad(src: string) {
 export function useBatchUpdate<T>(initialState: T) {
   const [state, setState] = React.useState<T>(initialState);
   const pendingUpdates = useRef<Array<(prevState: T) => T>>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const batchUpdate = useCallback((updater: (prevState: T) => T) => {
     pendingUpdates.current.push(updater);
@@ -334,7 +334,7 @@ export function useBatchUpdate<T>(initialState: T) {
 
 // 性能监控Hook
 export function usePerformanceMonitor(componentName: string) {
-  const mountTimeRef = useRef<number | undefined>();
+  const mountTimeRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     mountTimeRef.current = performance.now();
