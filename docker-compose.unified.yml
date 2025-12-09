@@ -120,7 +120,7 @@ services:
         ls -la /app/scripts/;
         npx prisma generate;
         npx prisma migrate deploy || echo '迁移可能已存在或无需执行';
-        node /app/scripts/init-database-embedded.js;
+        node /app/scripts/init-database-embedded.cjs;
         echo '数据库初始化完成';
       "
     restart: "no"
