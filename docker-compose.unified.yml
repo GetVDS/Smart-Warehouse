@@ -90,16 +90,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: deps
+      target: builder
     environment:
       - DATABASE_URL=file:${DB_PATH:-./data/custom.db}
       - NODE_ENV=${NODE_ENV:-production}
       - JWT_SECRET=${JWT_SECRET:-default-secret-change-in-production}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-default-secret-change-in-production}
+      - PASSWORD_MIN_LENGTH=${PASSWORD_MIN_LENGTH:-8}
+      - PASSWORD_REQUIRE_UPPERCASE=${PASSWORD_REQUIRE_UPPERCASE:-true}
+      - PASSWORD_REQUIRE_LOWERCASE=${PASSWORD_REQUIRE_LOWERCASE:-true}
+      - PASSWORD_REQUIRE_NUMBERS=${PASSWORD_REQUIRE_NUMBERS:-true}
+      - PASSWORD_REQUIRE_SYMBOLS=${PASSWORD_REQUIRE_SYMBOLS:-false}
+      - MAX_LOGIN_ATTEMPTS=${MAX_LOGIN_ATTEMPTS:-5}
+      - LOGIN_LOCKOUT_TIME_MS=${LOGIN_LOCKOUT_TIME_MS:-900000}
     volumes:
       - ./data:/app/data
       - ./prisma:/app/prisma:ro
+      - ./scripts:/app/scripts:ro
     networks:
       - app-network
     command: >
@@ -109,6 +117,7 @@ services:
         echo 'DATABASE_URL: $$DATABASE_URL';
         ls -la /app/;
         ls -la /app/prisma/;
+        ls -la /app/scripts/;
         npx prisma generate;
         npx prisma migrate deploy || echo '迁移可能已存在或无需执行';
         node /app/scripts/init-database-embedded.js;
