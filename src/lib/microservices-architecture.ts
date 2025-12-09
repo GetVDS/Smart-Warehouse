@@ -105,8 +105,4 @@ export class ServiceRegistry {
   }
 }
 
-// 导出类型
-export type {
-  ServiceDefinition,
-  ServiceHealth
-};
+// 导出类型（已在接口定义时导出，无需重复导出）
