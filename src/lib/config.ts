@@ -34,7 +34,7 @@ export const SECURITY_CONFIG = {
   
   // 登录安全
   MAX_LOGIN_ATTEMPTS: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5'),
-  LOGIN_LOCKOUT_TIME: parseInt(process.env.LOGIN_LOCKOUT_TIME || '900'), // 15分钟
+  LOGIN_LOCKOUT_TIME_MS: parseInt(process.env.LOGIN_LOCKOUT_TIME_MS || '900000'), // 15分钟
   PASSWORD_MIN_LENGTH: parseInt(process.env.PASSWORD_MIN_LENGTH || '8'),
   
   // 速率限制
