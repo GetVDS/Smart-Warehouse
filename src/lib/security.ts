@@ -87,14 +87,14 @@ export function checkLoginAttempts(identifier: string): { canAttempt: boolean; r
   }
   
   // 如果超过锁定时间，重置计数
-  if (now - attempts.lastAttempt > SECURITY_CONFIG.LOGIN_LOCKOUT_TIME_MS) {
+  if (now - attempts.lastAttempt > SECURITY_CONFIG.LOGIN_LOCKOUT_TIME) {
     loginAttempts.delete(identifier);
     return { canAttempt: true };
   }
   
   // 如果超过尝试次数限制
-  if (attempts.count >= SECURITY_CONFIG.LOGIN_ATTEMPT_LIMIT) {
-    const lockoutTime = SECURITY_CONFIG.LOGIN_LOCKOUT_TIME_MS - (now - attempts.lastAttempt);
+  if (attempts.count >= SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS) {
+    const lockoutTime = SECURITY_CONFIG.LOGIN_LOCKOUT_TIME - (now - attempts.lastAttempt);
     return { 
       canAttempt: false, 
       lockoutTime: Math.ceil(lockoutTime / 1000 / 60) // 返回分钟数
@@ -103,7 +103,7 @@ export function checkLoginAttempts(identifier: string): { canAttempt: boolean; r
   
   return { 
     canAttempt: true, 
-    remainingAttempts: SECURITY_CONFIG.LOGIN_ATTEMPT_LIMIT - attempts.count 
+    remainingAttempts: SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS - attempts.count
   };
 }
 
